@@ -22,7 +22,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Process packing slips and shipping labels
  */
 export const ProcessFilesBody = zod.object({
-  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_labels', 'sort_both']).describe('Processing preset')
+  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_labels', 'sort_both', 'match_labels']).describe('Processing preset')
 })
 
 export const ProcessFilesResponse = zod.object({

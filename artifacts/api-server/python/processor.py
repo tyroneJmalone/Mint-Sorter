@@ -35,6 +35,14 @@ def read_pdf_text_pages(path: str | Path) -> list[str]:
     return pages
 
 
+SIZE_ORDER: Dict[str, int] = {
+    "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4,
+    "2XL": 5, "3XL": 6, "4XL": 7, "5XL": 8, "6XL": 9,
+    "YXS": 10, "YS": 11, "YM": 12, "YL": 13, "YXL": 14,
+    "OSFA": 15, "OSFM": 16,
+}
+
+
 @dataclass
 class SlipPage:
     page_index: int
@@ -48,7 +56,8 @@ class SlipPage:
 
     @property
     def sort_key(self):
-        return (self.style, self.color, self.size, int(self.order_number or 0), self.page_index)
+        size_rank = SIZE_ORDER.get(self.size.upper(), 99)
+        return (self.style, self.color, size_rank, int(self.order_number or 0), self.page_index)
 
 
 @dataclass
@@ -296,6 +305,18 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         assert sorted_slips is not None
         labels, label_sources = parse_label_pdfs(label_pdfs)
         selected, report = match_labels_to_slips(sorted_slips, labels)
+        sorted_labels_pdf = out_dir / "sorted_shipping_labels.pdf"
+        write_sorted_labels(label_sources, sorted_labels_pdf, selected)
+        outputs["sorted_shipping_labels"] = sorted_labels_pdf
+        report_csv = out_dir / "match_report.csv"
+        report.to_csv(report_csv, index=False)
+        outputs["match_report"] = report_csv
+
+    if preset == "match_labels":
+        # Sort labels to match packing slips in their EXISTING order — no slip rewriting.
+        slips = parse_packing_slips(packing_slips_pdf)
+        labels, label_sources = parse_label_pdfs(label_pdfs)
+        selected, report = match_labels_to_slips(slips, labels)
         sorted_labels_pdf = out_dir / "sorted_shipping_labels.pdf"
         write_sorted_labels(label_sources, sorted_labels_pdf, selected)
         outputs["sorted_shipping_labels"] = sorted_labels_pdf

@@ -19,8 +19,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
 
-  const needsPackingSlips = ["sort_slips", "sort_labels", "sort_both"].includes(preset);
-  const needsLabels = ["combine_labels", "sort_labels", "sort_both"].includes(preset);
+  const needsPackingSlips = ["sort_slips", "sort_labels", "sort_both", "match_labels"].includes(preset);
+  const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels"].includes(preset);
 
   const handleProcess = async () => {
     if (needsPackingSlips && packingSlips.length === 0) {
@@ -116,6 +116,7 @@ export default function Home() {
                   <SelectItem value="sort_slips">Sort packing slips (Style → Color → Size → Order #)</SelectItem>
                   <SelectItem value="sort_labels">Sort labels to match sorted packing slips</SelectItem>
                   <SelectItem value="sort_both">Sort both packing slips and labels</SelectItem>
+                  <SelectItem value="match_labels">Sort labels to existing packing slip order (no slip sorting)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

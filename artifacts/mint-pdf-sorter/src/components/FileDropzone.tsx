@@ -67,6 +67,8 @@ export function FileDropzone({
       if (e.target.files && e.target.files.length > 0) {
         const selectedFiles = Array.from(e.target.files);
         onFilesAccepted(multiple ? selectedFiles : [selectedFiles[0]]);
+        // Reset so the same file can be re-selected after removal
+        e.target.value = "";
       }
     },
     [onFilesAccepted, multiple]

@@ -20,6 +20,7 @@ export const ProcessInputPreset = {
   sort_slips: 'sort_slips',
   sort_labels: 'sort_labels',
   sort_both: 'sort_both',
+  match_labels: 'match_labels',
 } as const;
 
 export interface ProcessInput {
