@@ -81,9 +81,14 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
     if not order:
         order = _first_match(r"Order\s*#\s*(\d+)", text)
 
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    # The very first line of each packing slip is reliably the customer name
+    # (e.g. "Su, Xizhen" or "Beauchesne, Ava") — use it as the primary fallback.
+    first_line_name = lines[0] if lines else ""
+
     # Header often looks like "Page 1 of 1 Order #1234567\nLast, First"
     header_name = ""
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for i, ln in enumerate(lines):
         if re.search(r"Order\s*#?\s*\d+", ln, re.I) and i + 1 < len(lines):
             header_name = lines[i + 1].strip()
@@ -91,11 +96,23 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
 
     shipping_block = _first_match(r"Customer Shipping:\s*(.*?)(?:Delivery\s*Method:|Sort\s*#|$)", text)
     shipping_lines = [ln.strip() for ln in shipping_block.splitlines() if ln.strip()]
-    shipping_name = shipping_lines[0] if shipping_lines else header_name
+    shipping_name_raw = shipping_lines[0] if shipping_lines else ""
+
+    # pdfplumber column layout often puts "Delivery" (from "Delivery Method:") as the
+    # first token after "Customer Shipping:" — detect and discard that artefact.
+    bad_slip_tokens = {"DELIVERY", "SHIPPING", "METHOD"}
+    if not shipping_name_raw or norm_text(shipping_name_raw) in bad_slip_tokens:
+        shipping_name = first_line_name or header_name
+    else:
+        shipping_name = shipping_name_raw
 
     billing_block = _first_match(r"Customer Billing:\s*(.*?)(?:Customer Shipping:|Delivery\s*Method:|$)", text)
     billing_lines = [ln.strip() for ln in billing_block.splitlines() if ln.strip()]
-    customer_name = billing_lines[0] if billing_lines else header_name
+    billing_name_raw = billing_lines[0] if billing_lines else ""
+    if not billing_name_raw or norm_text(billing_name_raw) in bad_slip_tokens:
+        customer_name = first_line_name or header_name
+    else:
+        customer_name = billing_name_raw
 
     # Extract product table row. These slips have: Sort # Style # Vendor Product ... Size Color Qty Price
     style = ""
@@ -128,19 +145,31 @@ def parse_label_text(text: str, page_index: int, source_file: str, source_page_i
     if not tracking:
         tracking = _first_match(r"(9\d{21,25})", re.sub(r"\s+", "", text))
 
-    # Most labels contain recipient after USPS service line and before SHIP TO details in parsed text.
     name = ""
     address = ""
+
+    # Pattern 1: "SHIP <NAME>\nTO:\n<address>" — common USPS label format.
     for i, ln in enumerate(lines):
-        if re.match(r"^[A-Z][A-Z .,'-]+$", ln) and i + 1 < len(lines):
-            # Skip sender/company and postal boilerplate.
-            bad = {"MINT PRINTWORKS", "USPS GROUND ADVANTAGE", "US POSTAGE FEES PAID IMI", "COMMERCIAL"}
-            if norm_text(ln) not in bad and not ln.startswith("USPS"):
-                nxt = lines[i + 1]
-                if re.search(r"\d", nxt):
-                    name = ln
-                    address = " | ".join(lines[i + 1:i + 4])
-                    break
+        if ln.startswith("SHIP ") and i + 1 < len(lines) and lines[i + 1].strip().rstrip(":").upper() in ("TO", "SHIP TO"):
+            candidate = ln[5:].strip()
+            if candidate:
+                name = candidate
+                # Address starts after the "TO:" line
+                address = " | ".join(lines[i + 2: i + 5])
+                break
+
+    # Pattern 2: all-caps name line followed by a line with a digit (street address).
+    if not name:
+        bad = {"MINT PRINTWORKS", "USPS GROUND ADVANTAGE", "US POSTAGE FEES PAID IMI", "COMMERCIAL"}
+        for i, ln in enumerate(lines):
+            if re.match(r"^[A-Z][A-Z .,'-]+$", ln) and i + 1 < len(lines):
+                if norm_text(ln) not in bad and not ln.startswith("USPS"):
+                    nxt = lines[i + 1]
+                    if re.search(r"\d", nxt):
+                        name = ln
+                        address = " | ".join(lines[i + 1:i + 4])
+                        break
+
     return LabelPage(page_index, name, address, tracking, source_file, source_page_index, text)
 
 
