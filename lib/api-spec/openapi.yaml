@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Mint PDF Sorter API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: process
+    description: PDF processing operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /process:
+    post:
+      operationId: processFiles
+      tags: [process]
+      summary: Process packing slips and shipping labels
+      description: Upload PDF files (multipart/form-data) with a preset; returns a job ID and output file list
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ProcessInput"
+      responses:
+        "200":
+          description: Processing complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /jobs/{jobId}/files/{key}:
+    get:
+      operationId: downloadFile
+      tags: [process]
+      summary: Download a processed output file
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Binary file content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Job or file not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +100,43 @@ components:
       required:
         - status
 
+    ProcessInput:
+      type: object
+      required:
+        - preset
+      properties:
+        preset:
+          type: string
+          enum: [combine_labels, sort_slips, sort_labels, sort_both]
+          description: Processing preset
+
+    OutputFile:
+      type: object
+      required: [key, filename, label, mime]
+      properties:
+        key:
+          type: string
+        filename:
+          type: string
+        label:
+          type: string
+        mime:
+          type: string
+
+    ProcessResult:
+      type: object
+      required: [jobId, outputs]
+      properties:
+        jobId:
+          type: string
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutputFile"
+
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
