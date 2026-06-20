@@ -10,6 +10,20 @@ import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ProcessInputPreset, OutputFile } from "@workspace/api-client-react";
 
+async function triggerDownload(url: string, filename: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
+}
+
 export default function Home() {
   const { toast } = useToast();
   const [preset, setPreset] = useState<ProcessInputPreset>("combine_labels");
@@ -231,14 +245,16 @@ export default function Home() {
                             </p>
                           </div>
                           <Button
-                            asChild
                             variant="default"
                             className="w-full"
+                            onClick={() =>
+                              triggerDownload(downloadUrl, output.filename).catch((err) =>
+                                toast({ variant: "destructive", title: "Download failed", description: err.message })
+                              )
+                            }
                           >
-                            <a href={downloadUrl} download={output.filename} target="_blank" rel="noreferrer">
-                              <Download className="mr-2 h-4 w-4" />
-                              Download
-                            </a>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
                           </Button>
                         </div>
                       );
