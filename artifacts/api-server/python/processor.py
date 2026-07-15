@@ -59,6 +59,13 @@ class SlipPage:
         size_rank = SIZE_ORDER.get(self.size.upper(), 99)
         return (self.style, self.color, size_rank, int(self.order_number or 0), self.page_index)
 
+    @property
+    def sort_key_name(self):
+        # shipping_name is "Last, First" — sort by last name token
+        last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
+        size_rank = SIZE_ORDER.get(self.size.upper(), 99)
+        return (self.style, self.color, size_rank, last, self.page_index)
+
 
 @dataclass
 class LabelPage:
@@ -323,6 +330,13 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         combined = out_dir / "combined_labels.pdf"
         combine_label_pdfs(label_pdfs, combined)
         outputs["combined_labels"] = combined
+
+    if preset == "sort_slips_name":
+        slips = parse_packing_slips(packing_slips_pdf)
+        sorted_by_name = sorted(slips, key=lambda s: s.sort_key_name)
+        sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf, [s.page_index for s in sorted_by_name])
+        outputs["sorted_packing_slips"] = sorted_slips_pdf
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:
