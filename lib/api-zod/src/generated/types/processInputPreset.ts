@@ -21,4 +21,5 @@ export const ProcessInputPreset = {
   sort_labels: 'sort_labels',
   sort_both: 'sort_both',
   match_labels: 'match_labels',
+  custom_sort: 'custom_sort',
 } as const;

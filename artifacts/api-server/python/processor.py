@@ -115,6 +115,10 @@ class SlipPage:
     raw_text: str
     custom_field_label: str = ""
     custom_field_value: str = ""
+    delivery_method: str = ""
+    location: str = ""
+    sort_number: str = ""
+    order_date: str = ""
 
     @property
     def sort_key(self):
@@ -142,6 +146,42 @@ class SlipPage:
         custom = norm_text(self.custom_field_value)
         last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
         return (custom, last, self.page_index)
+
+    def sort_value_for_field(self, field: str):
+        if field == "last_name":
+            return norm_text(self.shipping_name.split(",")[0]) if "," in self.shipping_name else norm_text(self.shipping_name)
+        if field == "first_name":
+            parts = self.shipping_name.split(",", 1)
+            return norm_text(parts[1].strip()) if len(parts) > 1 else ""
+        if field == "style":
+            return norm_text(self.style)
+        if field == "color":
+            return norm_text(self.color)
+        if field == "size":
+            key = norm_text(self.size).replace(" ", "")
+            return (SIZE_ORDER.get(key, 99), norm_text(self.size))
+        if field == "custom_field":
+            return norm_text(self.custom_field_value)
+        if field == "delivery_method":
+            return norm_text(self.delivery_method)
+        if field == "location":
+            return norm_text(self.location)
+        if field == "sort_number":
+            try:
+                return (0, int(self.sort_number))
+            except (ValueError, TypeError):
+                return (1, norm_text(self.sort_number))
+        if field == "order_number":
+            try:
+                return (0, int(self.order_number))
+            except (ValueError, TypeError):
+                return (1, norm_text(self.order_number))
+        if field == "order_date":
+            return self.order_date or ""
+        return ""
+
+    def build_sort_key(self, fields: list[str]) -> tuple:
+        return tuple(self.sort_value_for_field(f) for f in fields) + (self.page_index,)
 
 
 @dataclass
@@ -202,13 +242,15 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
     style = ""
     size = ""
     color = ""
+    sort_number = ""
     table_lines = [ln.strip() for ln in lines if ln.strip()]
     joined = "\n".join(table_lines)
 
     # Style is usually after Sort # in product row, e.g. "11 B5000 SanMar"
-    m = re.search(r"(?:^|\n)\s*\d+\s+([A-Z0-9-]{2,})\s+(?:SanMar|SS Activewear|S&S|AlphaBroder|.+?)", joined, re.I)
+    m = re.search(r"(?:^|\n)\s*(\d+)\s+([A-Z0-9-]{2,})\s+(?:SanMar|SS Activewear|S&S|AlphaBroder|.+?)", joined, re.I)
     if m:
-        style = m.group(1).strip().upper()
+        sort_number = m.group(1).strip()
+        style = m.group(2).strip().upper()
 
     # Size/color usually appear before qty/price/extended. Try table-specific extraction.
     # Examples: "OSFA Black/ Black 1 $22.00" or "OSFM Navy/ White/ Heather Grey 1 $20.00"
@@ -217,8 +259,13 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
         size, color = candidates[-1][0].upper(), re.sub(r"\s+", " ", candidates[-1][1]).strip()
 
     cf_label, cf_value = extract_custom_field(text)
+    delivery_method = _first_match(r"Delivery\s*Method:\s*([^\n]+)", text)
+    location = _first_match(r"Location(?:\s*Name)?:\s*([^\n]+)", text)
+    order_date = _first_match(r"Order\s*Date:\s*([^\n]+)", text)
     return SlipPage(page_index, order, customer_name, shipping_name, style, color, size, text,
-                    custom_field_label=cf_label, custom_field_value=cf_value)
+                    custom_field_label=cf_label, custom_field_value=cf_value,
+                    delivery_method=delivery_method, location=location,
+                    sort_number=sort_number, order_date=order_date)
 
 
 def parse_packing_slips(path: str | Path) -> list[SlipPage]:
@@ -425,6 +472,30 @@ def match_labels_to_slips(sorted_slips: list[SlipPage], labels: list[LabelPage])
     return selected, pd.DataFrame(rows)
 
 
+def _write_custom_sort_report(sorted_groups: list[list[SlipPage]], report_csv: Path) -> None:
+    rows = []
+    for seq, group in enumerate(sorted_groups, start=1):
+        s = group[0]
+        last = s.shipping_name.split(",")[0].strip() if "," in s.shipping_name else s.shipping_name
+        first = s.shipping_name.split(",", 1)[1].strip() if "," in s.shipping_name else ""
+        rows.append({
+            "sequence": seq,
+            "order_number": s.order_number,
+            "last_name": last,
+            "first_name": first,
+            "style": s.style,
+            "color": s.color,
+            "size": s.size,
+            "custom_field_label": s.custom_field_label,
+            "custom_field_value": s.custom_field_value,
+            "delivery_method": s.delivery_method,
+            "location": s.location,
+            "sort_number": s.sort_number,
+            "order_date": s.order_date,
+        })
+    pd.DataFrame(rows).to_csv(report_csv, index=False)
+
+
 def _write_custom_field_report(sorted_groups: list[list[SlipPage]], report_csv: Path) -> None:
     rows = []
     for seq, group in enumerate(sorted_groups, start=1):
@@ -443,7 +514,7 @@ def _write_custom_field_report(sorted_groups: list[list[SlipPage]], report_csv: 
     pd.DataFrame(rows).to_csv(report_csv, index=False)
 
 
-def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], out_dir: str | Path, preset: str) -> dict[str, Path]:
+def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], out_dir: str | Path, preset: str, sort_fields: list[str] | None = None) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, Path] = {}
@@ -485,6 +556,19 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         report_csv = out_dir / "custom_field_report.csv"
         _write_custom_field_report(sorted_groups, report_csv)
         outputs["custom_field_report"] = report_csv
+
+    if preset == "custom_sort":
+        fields = sort_fields or ["last_name"]
+        slips = parse_packing_slips(packing_slips_pdf)
+        groups = group_slip_pages(slips)
+        sorted_groups = sorted(groups, key=lambda g: g[0].build_sort_key(fields))
+        sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
+                             [s.page_index for g in sorted_groups for s in g])
+        outputs["sorted_packing_slips"] = sorted_slips_pdf
+        report_csv = out_dir / "custom_sort_report.csv"
+        _write_custom_sort_report(sorted_groups, report_csv)
+        outputs["custom_sort_report"] = report_csv
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:

@@ -32,6 +32,7 @@ const OUTPUT_LABELS: Record<string, string> = {
   sorted_shipping_labels: "Download sorted shipping labels PDF",
   match_report: "Download match report CSV",
   custom_field_report: "Download custom field report CSV",
+  custom_sort_report: "Download sort report CSV",
   zip: "Download all outputs (ZIP)",
 };
 
@@ -43,8 +44,23 @@ router.post(
   ]),
   async (req, res): Promise<void> => {
     const preset = req.body?.preset as string | undefined;
-    if (!preset || !["combine_labels", "sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels"].includes(preset)) {
+    if (!preset || !["combine_labels", "sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort"].includes(preset)) {
       res.status(400).json({ error: "Invalid or missing preset" });
+      return;
+    }
+
+    const sortFieldsRaw = req.body?.sort_fields as string | undefined;
+    let sortFields: string[] = [];
+    if (sortFieldsRaw) {
+      try {
+        sortFields = JSON.parse(sortFieldsRaw);
+      } catch {
+        res.status(400).json({ error: "sort_fields must be a valid JSON array" });
+        return;
+      }
+    }
+    if (preset === "custom_sort" && sortFields.length === 0) {
+      res.status(400).json({ error: "custom_sort preset requires at least one sort field" });
       return;
     }
 
@@ -52,7 +68,7 @@ router.post(
     const packingFiles = files?.["packing_slips"] ?? [];
     const labelFiles = files?.["labels"] ?? [];
 
-    if (["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels"].includes(preset) && packingFiles.length === 0) {
+    if (["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort"].includes(preset) && packingFiles.length === 0) {
       res.status(400).json({ error: "Packing slips PDF is required for this preset" });
       return;
     }
@@ -74,6 +90,7 @@ router.post(
       preset,
       packingPath,
       outDir,
+      ...(sortFields.length > 0 ? ["--sort-fields", JSON.stringify(sortFields)] : []),
       ...labelPaths,
     ];
 

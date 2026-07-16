@@ -131,6 +131,9 @@ export const getProcessFilesUrl = () => {
 export const processFiles = async (processInput: ProcessInput, options?: RequestInit): Promise<ProcessResult> => {
     const formData = new FormData();
 formData.append(`preset`, processInput.preset);
+if(processInput.sort_fields !== undefined) {
+ formData.append(`sort_fields`, processInput.sort_fields);
+ }
 
   return customFetch<ProcessResult>(getProcessFilesUrl(),
   {

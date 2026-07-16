@@ -107,8 +107,11 @@ components:
       properties:
         preset:
           type: string
-          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels]
+          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels, custom_sort]
           description: Processing preset
+        sort_fields:
+          type: string
+          description: "JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date"
 
     OutputFile:
       type: object

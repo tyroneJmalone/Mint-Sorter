@@ -24,11 +24,14 @@ export const ProcessInputPreset = {
   sort_labels: 'sort_labels',
   sort_both: 'sort_both',
   match_labels: 'match_labels',
+  custom_sort: 'custom_sort',
 } as const;
 
 export interface ProcessInput {
   /** Processing preset */
   preset: ProcessInputPreset;
+  /** JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date */
+  sort_fields?: string;
 }
 
 export interface OutputFile {

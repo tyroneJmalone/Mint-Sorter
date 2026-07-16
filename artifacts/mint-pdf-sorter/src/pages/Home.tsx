@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ProcessInputPreset, OutputFile } from "@workspace/api-client-react";
+import { CustomSortBuilder } from "@/components/CustomSortBuilder";
 
 async function triggerDownload(url: string, filename: string) {
   const response = await fetch(url);
@@ -27,13 +28,14 @@ async function triggerDownload(url: string, filename: string) {
 export default function Home() {
   const { toast } = useToast();
   const [preset, setPreset] = useState<ProcessInputPreset>("combine_labels");
+  const [sortFields, setSortFields] = useState<string[]>([]);
   const [packingSlips, setPackingSlips] = useState<File[]>([]);
   const [labels, setLabels] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
 
-  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels"].includes(preset);
+  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort"].includes(preset);
   const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels"].includes(preset);
 
   const handleProcess = async () => {
@@ -45,6 +47,10 @@ export default function Home() {
       setError("Shipping labels are required for this preset.");
       return;
     }
+    if (preset === "custom_sort" && sortFields.length === 0) {
+      setError("Add at least one sort field before processing.");
+      return;
+    }
 
     setError(null);
     setIsProcessing(true);
@@ -53,6 +59,10 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("preset", preset);
+
+      if (preset === "custom_sort") {
+        formData.append("sort_fields", JSON.stringify(sortFields));
+      }
       
       if (needsPackingSlips && packingSlips[0]) {
         formData.append("packing_slips", packingSlips[0]);
@@ -134,11 +144,25 @@ export default function Home() {
                   <SelectItem value="sort_labels">Sort labels to match sorted packing slips</SelectItem>
                   <SelectItem value="sort_both">Sort both packing slips and labels</SelectItem>
                   <SelectItem value="match_labels">Sort labels to existing packing slip order (no slip sorting)</SelectItem>
+                  <SelectItem value="custom_sort">Custom Sort (Build Your Own)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <AnimatePresence mode="popLayout">
+              {preset === "custom_sort" && (
+                <motion.div
+                  key="custom-sort-builder"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-3"
+                >
+                  <Label>Sort Configuration</Label>
+                  <CustomSortBuilder value={sortFields} onChange={setSortFields} />
+                </motion.div>
+              )}
+
               {needsPackingSlips && (
                 <motion.div
                   key="packing-slips"
