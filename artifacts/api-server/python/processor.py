@@ -136,6 +136,13 @@ class SlipPage:
         custom = norm_text(self.custom_field_value)
         return (self.style, self.color, size_rank, last, custom, self.page_index)
 
+    @property
+    def sort_key_custom_first(self):
+        # Custom Field → Last Name
+        custom = norm_text(self.custom_field_value)
+        last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
+        return (custom, last, self.page_index)
+
 
 @dataclass
 class LabelPage:
@@ -441,6 +448,15 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom)
+        sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
+                             [s.page_index for g in sorted_groups for s in g])
+        outputs["sorted_packing_slips"] = sorted_slips_pdf
+
+    if preset == "sort_slips_custom_first":
+        slips = parse_packing_slips(packing_slips_pdf)
+        groups = group_slip_pages(slips)
+        sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])

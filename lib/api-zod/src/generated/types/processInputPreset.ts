@@ -17,6 +17,7 @@ export const ProcessInputPreset = {
   sort_slips: 'sort_slips',
   sort_slips_name: 'sort_slips_name',
   sort_slips_custom: 'sort_slips_custom',
+  sort_slips_custom_first: 'sort_slips_custom_first',
   sort_labels: 'sort_labels',
   sort_both: 'sort_both',
   match_labels: 'match_labels',
