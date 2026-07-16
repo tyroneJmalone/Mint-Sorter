@@ -31,6 +31,7 @@ const OUTPUT_LABELS: Record<string, string> = {
   sorted_packing_slips: "Download sorted packing slips PDF",
   sorted_shipping_labels: "Download sorted shipping labels PDF",
   match_report: "Download match report CSV",
+  custom_field_report: "Download custom field report CSV",
   zip: "Download all outputs (ZIP)",
 };
 

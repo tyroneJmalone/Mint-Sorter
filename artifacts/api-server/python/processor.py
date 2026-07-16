@@ -425,6 +425,24 @@ def match_labels_to_slips(sorted_slips: list[SlipPage], labels: list[LabelPage])
     return selected, pd.DataFrame(rows)
 
 
+def _write_custom_field_report(sorted_groups: list[list[SlipPage]], report_csv: Path) -> None:
+    rows = []
+    for seq, group in enumerate(sorted_groups, start=1):
+        s = group[0]
+        rows.append({
+            "sequence": seq,
+            "order_number": s.order_number,
+            "slip_name": s.shipping_name,
+            "style": s.style,
+            "color": s.color,
+            "size": s.size,
+            "custom_field_label": s.custom_field_label,
+            "custom_field_value": s.custom_field_value,
+            "extracted": "yes" if s.custom_field_value else "NO - not found",
+        })
+    pd.DataFrame(rows).to_csv(report_csv, index=False)
+
+
 def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], out_dir: str | Path, preset: str) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -452,6 +470,9 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
         outputs["sorted_packing_slips"] = sorted_slips_pdf
+        report_csv = out_dir / "custom_field_report.csv"
+        _write_custom_field_report(sorted_groups, report_csv)
+        outputs["custom_field_report"] = report_csv
 
     if preset == "sort_slips_custom_first":
         slips = parse_packing_slips(packing_slips_pdf)
@@ -461,6 +482,9 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
         outputs["sorted_packing_slips"] = sorted_slips_pdf
+        report_csv = out_dir / "custom_field_report.csv"
+        _write_custom_field_report(sorted_groups, report_csv)
+        outputs["custom_field_report"] = report_csv
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:
