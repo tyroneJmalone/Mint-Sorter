@@ -107,7 +107,7 @@ components:
       properties:
         preset:
           type: string
-          enum: [combine_labels, sort_slips, sort_slips_name, sort_labels, sort_both, match_labels]
+          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_labels, sort_both, match_labels]
           description: Processing preset
 
     OutputFile:

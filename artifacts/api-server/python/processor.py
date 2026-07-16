@@ -43,6 +43,66 @@ SIZE_ORDER: Dict[str, int] = {
 }
 
 
+def extract_custom_field(text: str) -> tuple[str, str]:
+    """
+    Extract a custom grouping field from the delivery section of a packing slip.
+    The label varies by job (e.g. Department, Homeroom, Teacher Name, Team).
+    Returns (label, value). Both are empty strings when no custom field is found.
+
+    The custom field always appears immediately after "Recipient Last Name:" in the
+    delivery column. pdfplumber renders it in one of two layouts:
+
+      Split form:   "Department Pharmacy"  (then)  "Name:"   (on the next line)
+      Inline form:  "Department Name: claims"       (all on one line)
+    """
+    lines = [ln.strip() for ln in text.splitlines()]
+
+    # Find the "Recipient Last <value>" line so we can anchor our search to right after it.
+    recipient_last_idx = None
+    for i, ln in enumerate(lines):
+        if ln.lower().startswith("recipient last"):
+            recipient_last_idx = i
+            break
+
+    if recipient_last_idx is None:
+        return ("", "")
+
+    # Locate the "Name:" line that closes the Recipient Last field.
+    name_colon_idx = None
+    for i in range(recipient_last_idx + 1, min(recipient_last_idx + 4, len(lines))):
+        if lines[i] == "Name:":
+            name_colon_idx = i
+            break
+
+    if name_colon_idx is None:
+        return ("", "")
+
+    # The very next line after "Name:" is either the custom field or the product table header.
+    after_idx = name_colon_idx + 1
+    if after_idx >= len(lines):
+        return ("", "")
+
+    next_line = lines[after_idx]
+
+    # Inline form: "Department Name: claims" or "Teacher Name: Smith"
+    m = re.match(r"^(.+?)\s+Name:\s+(.+)$", next_line)
+    if m:
+        return (m.group(1).strip(), m.group(2).strip())
+
+    # Split form: "Department Pharmacy" followed by "Name:" on the next line.
+    if after_idx + 1 < len(lines) and lines[after_idx + 1] == "Name:":
+        words = next_line.split()
+        if len(words) >= 2:
+            return (words[0], " ".join(words[1:]))
+
+    # Bare label form: "Homeroom: 5A" or "Team: Blue" (no trailing "Name:")
+    m = re.match(r"^([A-Za-z][A-Za-z ]{1,30}):\s+(\S.*)$", next_line)
+    if m:
+        return (m.group(1).strip(), m.group(2).strip())
+
+    return ("", "")
+
+
 @dataclass
 class SlipPage:
     page_index: int
@@ -53,6 +113,8 @@ class SlipPage:
     color: str
     size: str
     raw_text: str
+    custom_field_label: str = ""
+    custom_field_value: str = ""
 
     @property
     def sort_key(self):
@@ -65,6 +127,14 @@ class SlipPage:
         last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
         size_rank = SIZE_ORDER.get(self.size.upper(), 99)
         return (self.style, self.color, size_rank, last, self.page_index)
+
+    @property
+    def sort_key_custom(self):
+        # Style → Color → Size → Last Name → Custom Field value
+        last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
+        size_rank = SIZE_ORDER.get(self.size.upper(), 99)
+        custom = norm_text(self.custom_field_value)
+        return (self.style, self.color, size_rank, last, custom, self.page_index)
 
 
 @dataclass
@@ -139,7 +209,9 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
     if candidates:
         size, color = candidates[-1][0].upper(), re.sub(r"\s+", " ", candidates[-1][1]).strip()
 
-    return SlipPage(page_index, order, customer_name, shipping_name, style, color, size, text)
+    cf_label, cf_value = extract_custom_field(text)
+    return SlipPage(page_index, order, customer_name, shipping_name, style, color, size, text,
+                    custom_field_label=cf_label, custom_field_value=cf_value)
 
 
 def parse_packing_slips(path: str | Path) -> list[SlipPage]:
@@ -224,11 +296,36 @@ def write_sorted_labels(label_sources: list[tuple[str, int]], output_pdf: str | 
         writer.write(f)
 
 
+def group_slip_pages(slips: list[SlipPage]) -> list[list[SlipPage]]:
+    """
+    Group consecutive PDF pages into logical slips.
+
+    A multi-page order (e.g. "Page 1 of 2 / Page 2 of 2") produces one page per PDF page,
+    but the continuation pages have no customer name or order number — they are just totals
+    overflow. Attach any page that has no order number (or the same order number as the
+    preceding group) to the preceding group so they sort and output together as one unit.
+    """
+    if not slips:
+        return []
+    groups: list[list[SlipPage]] = []
+    current: list[SlipPage] = [slips[0]]
+    for slip in slips[1:]:
+        if not slip.order_number or slip.order_number == current[0].order_number:
+            current.append(slip)
+        else:
+            groups.append(current)
+            current = [slip]
+    groups.append(current)
+    return groups
+
+
 def sort_packing_slips(input_pdf: str | Path, output_pdf: str | Path) -> list[SlipPage]:
     slips = parse_packing_slips(input_pdf)
-    sorted_slips = sorted(slips, key=lambda s: s.sort_key)
-    write_selected_pages(input_pdf, output_pdf, [s.page_index for s in sorted_slips])
-    return sorted_slips
+    groups = group_slip_pages(slips)
+    sorted_groups = sorted(groups, key=lambda g: g[0].sort_key)
+    all_pages = [s.page_index for g in sorted_groups for s in g]
+    write_selected_pages(input_pdf, output_pdf, all_pages)
+    return [g[0] for g in sorted_groups]
 
 
 def match_labels_to_slips(sorted_slips: list[SlipPage], labels: list[LabelPage]) -> tuple[list[int], pd.DataFrame]:
@@ -333,9 +430,20 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
 
     if preset == "sort_slips_name":
         slips = parse_packing_slips(packing_slips_pdf)
-        sorted_by_name = sorted(slips, key=lambda s: s.sort_key_name)
+        groups = group_slip_pages(slips)
+        sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_name)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
-        write_selected_pages(packing_slips_pdf, sorted_slips_pdf, [s.page_index for s in sorted_by_name])
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
+                             [s.page_index for g in sorted_groups for s in g])
+        outputs["sorted_packing_slips"] = sorted_slips_pdf
+
+    if preset == "sort_slips_custom":
+        slips = parse_packing_slips(packing_slips_pdf)
+        groups = group_slip_pages(slips)
+        sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom)
+        sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
+                             [s.page_index for g in sorted_groups for s in g])
         outputs["sorted_packing_slips"] = sorted_slips_pdf
 
     sorted_slips: list[SlipPage] | None = None
