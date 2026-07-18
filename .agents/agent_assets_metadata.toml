@@ -6,3 +6,9 @@ id = "og50HcWwV-yY94_LbI0-1"
 uri = "file://mint-pdf-sorter-context.md"
 type = "text"
 title = "Mint PDF Sorter — App Context"
+
+[[outputs]]
+id = "Mn-yia2ipTrLkOvLqGPTb"
+uri = "file://AGENT_CONTEXT.md"
+type = "text"
+title = "Mint PDF Sorter — Agent Context Document"
