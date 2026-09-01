@@ -145,7 +145,7 @@ export default function Home() {
                   <SelectItem value="sort_both">Sort both packing slips and labels</SelectItem>
                   <SelectItem value="match_labels">Sort labels to existing packing slip order (no slip sorting)</SelectItem>
                   <SelectItem value="custom_sort">Custom Sort (Build Your Own)</SelectItem>
-                  <SelectItem value="required_field">REQUIRED FIELD (Birth Year — oldest to most recent)</SelectItem>
+                  <SelectItem value="required_field">Sort packing slips (Required Field: Birth Year Oldest to Recent)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
