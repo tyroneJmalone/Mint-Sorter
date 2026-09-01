@@ -22,7 +22,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Process packing slips and shipping labels
  */
 export const ProcessFilesBody = zod.object({
-  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort']).describe('Processing preset'),
+  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort', 'required_field']).describe('Processing preset'),
   "sort_fields": zod.string().optional().describe('JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date')
 })
 

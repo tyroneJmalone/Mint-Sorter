@@ -35,7 +35,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
 
-  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort"].includes(preset);
+  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field"].includes(preset);
   const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels"].includes(preset);
 
   const handleProcess = async () => {
@@ -145,6 +145,7 @@ export default function Home() {
                   <SelectItem value="sort_both">Sort both packing slips and labels</SelectItem>
                   <SelectItem value="match_labels">Sort labels to existing packing slip order (no slip sorting)</SelectItem>
                   <SelectItem value="custom_sort">Custom Sort (Build Your Own)</SelectItem>
+                  <SelectItem value="required_field">REQUIRED FIELD (Birth Year — oldest to most recent)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

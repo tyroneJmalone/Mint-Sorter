@@ -103,6 +103,81 @@ def extract_custom_field(text: str) -> tuple[str, str]:
     return ("", "")
 
 
+def _is_red_color(color: object) -> bool:
+    """Return whether a pdfplumber color value is visibly red."""
+    if not isinstance(color, (tuple, list)) or len(color) < 3:
+        return False
+    try:
+        red, green, blue = (float(channel) for channel in color[:3])
+    except (TypeError, ValueError):
+        return False
+    return red > 0.35 and red > green * 1.4 and red > blue * 1.4
+
+
+def extract_required_field_from_page(page) -> str:
+    """
+    Read the red text in the Product Name column.
+
+    Printavo marks required product fields with red text. The normal text
+    extractor intentionally ignores color, so this uses page characters and
+    the table header coordinates to isolate that red value.
+    """
+    words = page.extract_words(x_tolerance=1, y_tolerance=3)
+    product_word = next(
+        (word for word in words if word["text"].strip().lower() == "product"),
+        None,
+    )
+    size_word = next(
+        (
+            word for word in words
+            if word["text"].strip().lower() == "size"
+            and product_word is not None
+            and abs(word["top"] - product_word["top"]) < 3
+            and word["x0"] > product_word["x0"]
+        ),
+        None,
+    )
+    if product_word is None or size_word is None:
+        return ""
+
+    left = float(product_word["x0"]) - 2
+    right = float(size_word["x0"]) - 2
+    table_top = float(product_word["bottom"]) + 2
+    red_chars = [
+        char
+        for char in page.chars
+        if float(char.get("top", 0)) >= table_top
+        and left <= float(char.get("x0", 0)) < right
+        and (
+            _is_red_color(char.get("non_stroking_color"))
+            or _is_red_color(char.get("stroking_color"))
+        )
+    ]
+    if not red_chars:
+        return ""
+
+    # Keep line breaks and word gaps while only retaining the red characters.
+    lines: list[list[dict]] = []
+    for char in sorted(red_chars, key=lambda item: (float(item["top"]), float(item["x0"]))):
+        if not lines or abs(float(char["top"]) - float(lines[-1][0]["top"])) > 2:
+            lines.append([char])
+        else:
+            lines[-1].append(char)
+
+    rendered_lines: list[str] = []
+    for line in lines:
+        line = sorted(line, key=lambda item: float(item["x0"]))
+        rendered = line[0]["text"]
+        for previous, char in zip(line, line[1:]):
+            gap = float(char["x0"]) - float(previous["x1"])
+            if gap > max(1.5, float(previous.get("size", 8)) * 0.25):
+                rendered += " "
+            rendered += char["text"]
+        if rendered.strip():
+            rendered_lines.append(rendered.strip())
+    return " ".join(rendered_lines)
+
+
 @dataclass
 class SlipPage:
     page_index: int
@@ -119,6 +194,7 @@ class SlipPage:
     location: str = ""
     sort_number: str = ""
     order_date: str = ""
+    required_field_value: str = ""
 
     @property
     def sort_key(self):
@@ -146,6 +222,15 @@ class SlipPage:
         custom = norm_text(self.custom_field_value)
         last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
         return (custom, last, self.page_index)
+
+    @property
+    def sort_key_required_field(self):
+        # Birth years sort chronologically, oldest first. Slips without a
+        # recognizable year are kept after slips with a valid year.
+        match = re.search(r"(?<!\d)(?:18|19|20)\d{2}(?!\d)", self.required_field_value)
+        if match:
+            return (0, int(match.group(0)), self.page_index)
+        return (1, 9999, norm_text(self.required_field_value), self.page_index)
 
     def sort_value_for_field(self, field: str):
         if field == "last_name":
@@ -178,6 +263,8 @@ class SlipPage:
                 return (1, norm_text(self.order_number))
         if field == "order_date":
             return self.order_date or ""
+        if field == "required_field":
+            return self.sort_key_required_field
         return ""
 
     def build_sort_key(self, fields: list[str]) -> tuple:
@@ -200,7 +287,7 @@ def _first_match(pattern: str, text: str, flags=re.I | re.S) -> str:
     return m.group(1).strip() if m else ""
 
 
-def parse_slip_text(text: str, page_index: int) -> SlipPage:
+def parse_slip_text(text: str, page_index: int, required_field_value: str = "") -> SlipPage:
     order = _first_match(r"Order\s*(?:Number|#)\s*:?\s*#?\s*(\d+)", text)
     if not order:
         order = _first_match(r"Order\s*#\s*(\d+)", text)
@@ -265,11 +352,18 @@ def parse_slip_text(text: str, page_index: int) -> SlipPage:
     return SlipPage(page_index, order, customer_name, shipping_name, style, color, size, text,
                     custom_field_label=cf_label, custom_field_value=cf_value,
                     delivery_method=delivery_method, location=location,
-                    sort_number=sort_number, order_date=order_date)
+                    sort_number=sort_number, order_date=order_date,
+                    required_field_value=required_field_value)
 
 
 def parse_packing_slips(path: str | Path) -> list[SlipPage]:
-    return [parse_slip_text(txt, i) for i, txt in enumerate(read_pdf_text_pages(path))]
+    slips: list[SlipPage] = []
+    with pdfplumber.open(str(path)) as pdf:
+        for i, page in enumerate(pdf.pages):
+            text = page.extract_text(x_tolerance=1, y_tolerance=3) or ""
+            required_field_value = extract_required_field_from_page(page)
+            slips.append(parse_slip_text(text, i, required_field_value))
+    return slips
 
 
 def parse_label_text(text: str, page_index: int, source_file: str, source_page_index: int) -> LabelPage:
@@ -492,6 +586,7 @@ def _write_custom_sort_report(sorted_groups: list[list[SlipPage]], report_csv: P
             "location": s.location,
             "sort_number": s.sort_number,
             "order_date": s.order_date,
+            "required_field_value": s.required_field_value,
         })
     pd.DataFrame(rows).to_csv(report_csv, index=False)
 
@@ -569,6 +664,18 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         report_csv = out_dir / "custom_sort_report.csv"
         _write_custom_sort_report(sorted_groups, report_csv)
         outputs["custom_sort_report"] = report_csv
+
+    if preset == "required_field":
+        slips = parse_packing_slips(packing_slips_pdf)
+        groups = group_slip_pages(slips)
+        sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_required_field)
+        sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
+        write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
+                             [s.page_index for g in sorted_groups for s in g])
+        outputs["sorted_packing_slips"] = sorted_slips_pdf
+        report_csv = out_dir / "required_field_report.csv"
+        _write_custom_sort_report(sorted_groups, report_csv)
+        outputs["required_field_report"] = report_csv
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:
