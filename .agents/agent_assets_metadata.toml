@@ -28,3 +28,17 @@ mtime_ms = 1788234817478
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/27ea23a1-e2a2-4391-b0b9-9464c5980082/22f185af-4844-4ef3-9102-7921ba53af51"
 storage_version_token = "1788234825806858"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "dgpHdZwxLC_vZ492b2ZPv"
+uri = "file://examples/sorted_packing_slips_consolidated.pdf"
+type = "pdf"
+title = "Consolidated packing slips batch"
+description = "Processed full batch: totals-only continuation pages were condensed onto the preceding page, while pages containing product rows were preserved."
+logical_id = "fdee38ab-f5d6-4b03-9886-491953376600"
+content_hash = "sha256:311aaa36dd9875ca61fc37edb21c0fa6a281ec4e1a86d33ef40bb6c0d33c8fce"
+size = 1186525
+mtime_ms = 1788235332761
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/fdee38ab-f5d6-4b03-9886-491953376600/728e83ed-af2f-42da-8435-b4b01142cab9"
+storage_version_token = "1788235363528171"
+content_type = "application/pdf"

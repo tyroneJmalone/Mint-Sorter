@@ -1,0 +1,1 @@
+- [Packing-slip page consolidation](packing-slip-page-consolidation.md) — collapse totals-only continuation pages, but preserve pages containing product rows.
