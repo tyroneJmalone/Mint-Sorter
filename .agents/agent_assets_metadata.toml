@@ -6,9 +6,25 @@ id = "og50HcWwV-yY94_LbI0-1"
 uri = "file://mint-pdf-sorter-context.md"
 type = "text"
 title = "Mint PDF Sorter — App Context"
+logical_id = "92929e2e-213c-4eaa-bebc-57c74e8ff216"
 
 [[outputs]]
 id = "Mn-yia2ipTrLkOvLqGPTb"
 uri = "file://AGENT_CONTEXT.md"
 type = "text"
 title = "Mint PDF Sorter — Agent Context Document"
+logical_id = "d823b537-8268-4ab5-afd0-66067d92efb0"
+
+[[outputs]]
+id = "w0xIdCKslq-mPSsQCA9J3"
+uri = "file://examples/required-field-single-page-example.pdf"
+type = "pdf"
+title = "Single-page packing slip example"
+description = "Example using the first order from the attached batch: the totals and payment summary are condensed onto page 1, producing a one-page order."
+logical_id = "27ea23a1-e2a2-4391-b0b9-9464c5980082"
+content_hash = "sha256:d94256ed404d2ded2637bb21bdd5a4fef66f38e9966618de399e89f37f422d43"
+size = 194437
+mtime_ms = 1788234817478
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/27ea23a1-e2a2-4391-b0b9-9464c5980082/22f185af-4844-4ef3-9102-7921ba53af51"
+storage_version_token = "1788234825806858"
+content_type = "application/pdf"
