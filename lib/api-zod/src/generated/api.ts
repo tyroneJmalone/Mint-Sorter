@@ -22,8 +22,9 @@ export const HealthCheckResponse = zod.object({
  * @summary Process packing slips and shipping labels
  */
 export const ProcessFilesBody = zod.object({
-  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort', 'required_field', 'split_required_field']).describe('Processing preset'),
-  "sort_fields": zod.string().optional().describe('JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date')
+  "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort', 'required_field', 'split_required_field', 'spreadsheet_sequence']).describe('Processing preset'),
+  "sort_fields": zod.string().optional().describe('JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date'),
+  "spreadsheet_mapping": zod.string().optional().describe('JSON column mapping used by the spreadsheet_sequence preset')
 })
 
 export const ProcessFilesResponse = zod.object({
@@ -33,6 +34,21 @@ export const ProcessFilesResponse = zod.object({
   "filename": zod.string(),
   "label": zod.string(),
   "mime": zod.string()
+}))
+})
+
+
+/**
+ * @summary Preview spreadsheet sheets and rows for column mapping
+ */
+export const InspectSpreadsheetBody = zod.object({
+  "spreadsheet": zod.string().describe('CSV or XLSX spreadsheet upload')
+})
+
+export const InspectSpreadsheetResponse = zod.object({
+  "sheets": zod.array(zod.object({
+  "name": zod.string(),
+  "rows": zod.array(zod.array(zod.string()))
 }))
 })
 

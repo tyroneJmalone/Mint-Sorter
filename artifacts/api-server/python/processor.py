@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import io
+import csv
+import json
 import re
 import zipfile
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterable, List, Dict, Tuple, Optional
+from xml.etree import ElementTree
 
 import pandas as pd
 import pdfplumber
 from pypdf import PdfReader, PdfWriter
+
+
+SHEET_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+REL_NS = {"r": "http://schemas.openxmlformats.org/package/2006/relationships"}
+OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 def norm_text(s: str | None) -> str:
@@ -25,6 +33,91 @@ def norm_name(s: str | None) -> str:
     # Convert LAST FIRST-ish noise into stable tokens. Keep token order mostly intact.
     stop = {"USA", "US", "UNIT", "APT", "STE", "SUITE"}
     return " ".join(t for t in s.split() if t not in stop)
+
+
+def person_name_key(s: str | None) -> str:
+    """Normalize First Last, Last First, and Last, First into the same key."""
+    tokens = [token for token in norm_name(s).split() if len(token) > 1]
+    return " ".join(sorted(tokens))
+
+
+def _column_index(cell_reference: str) -> int:
+    letters = re.match(r"[A-Z]+", cell_reference.upper())
+    if not letters:
+        return 0
+    value = 0
+    for letter in letters.group(0):
+        value = value * 26 + ord(letter) - ord("A") + 1
+    return value - 1
+
+
+def _read_xlsx_sheets(path: str | Path) -> dict[str, list[list[str]]]:
+    with zipfile.ZipFile(path) as archive:
+        shared_strings: list[str] = []
+        if "xl/sharedStrings.xml" in archive.namelist():
+            root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
+            for item in root.findall("a:si", SHEET_NS):
+                shared_strings.append("".join(node.text or "" for node in item.iter(f"{{{SHEET_NS['a']}}}t")))
+
+        workbook = ElementTree.fromstring(archive.read("xl/workbook.xml"))
+        relationships = ElementTree.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        targets = {
+            relationship.attrib["Id"]: relationship.attrib["Target"].lstrip("/")
+            for relationship in relationships.findall("r:Relationship", REL_NS)
+        }
+        sheets: dict[str, list[list[str]]] = {}
+        for sheet in workbook.findall(".//a:sheets/a:sheet", SHEET_NS):
+            name = sheet.attrib.get("name", "Sheet")
+            relationship_id = sheet.attrib.get(f"{{{OFFICE_REL_NS}}}id", "")
+            target = targets.get(relationship_id, "")
+            if target.startswith("xl/"):
+                sheet_path = target
+            else:
+                sheet_path = f"xl/{target}"
+            sheet_root = ElementTree.fromstring(archive.read(sheet_path))
+            rows: list[list[str]] = []
+            for row in sheet_root.findall(".//a:sheetData/a:row", SHEET_NS):
+                values: dict[int, str] = {}
+                for cell in row.findall("a:c", SHEET_NS):
+                    reference = cell.attrib.get("r", "A1")
+                    cell_type = cell.attrib.get("t", "")
+                    value_node = cell.find("a:v", SHEET_NS)
+                    value = value_node.text or "" if value_node is not None else ""
+                    if cell_type == "s" and value:
+                        value = shared_strings[int(value)]
+                    elif cell_type == "inlineStr":
+                        value = "".join(
+                            node.text or ""
+                            for node in cell.iter(f"{{{SHEET_NS['a']}}}t")
+                        )
+                    values[_column_index(reference)] = value
+                width = max(values, default=-1) + 1
+                rows.append([values.get(index, "") for index in range(width)])
+            sheets[name] = rows
+        return sheets
+
+
+def read_spreadsheet_sheets(path: str | Path, original_name: str = "") -> dict[str, list[list[str]]]:
+    suffix = Path(original_name or path).suffix.lower()
+    if suffix == ".csv":
+        with open(path, newline="", encoding="utf-8-sig") as file:
+            return {"CSV": [[str(value) for value in row] for row in csv.reader(file)]}
+    if suffix == ".xlsx":
+        return _read_xlsx_sheets(path)
+    raise ValueError("Spreadsheet must be a CSV or XLSX file")
+
+
+def inspect_spreadsheet(path: str | Path, original_name: str = "") -> dict:
+    sheets = read_spreadsheet_sheets(path, original_name)
+    return {
+        "sheets": [
+            {
+                "name": name,
+                "rows": rows[:20],
+            }
+            for name, rows in sheets.items()
+        ]
+    }
 
 
 def read_pdf_text_pages(path: str | Path) -> list[str]:
@@ -676,7 +769,174 @@ def split_packing_slips_by_required_field(
     return outputs
 
 
-def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], out_dir: str | Path, preset: str, sort_fields: list[str] | None = None) -> dict[str, Path]:
+def sort_to_spreadsheet_sequence(
+    packing_slips_pdf: str | Path,
+    label_pdfs: list[str | Path],
+    spreadsheet_path: str | Path,
+    spreadsheet_name: str,
+    mapping: dict,
+    out_dir: Path,
+) -> dict[str, Path]:
+    sheets = read_spreadsheet_sheets(spreadsheet_path, spreadsheet_name)
+    sheet_name = str(mapping.get("sheet_name") or next(iter(sheets), ""))
+    if sheet_name not in sheets:
+        raise ValueError(f"Spreadsheet sheet not found: {sheet_name}")
+    rows = sheets[sheet_name]
+    header_row = int(mapping.get("header_row", 1))
+    if header_row < 1 or header_row > len(rows):
+        raise ValueError("Spreadsheet header row is out of range")
+    headers = rows[header_row - 1]
+    header_lookup = {str(value).strip(): index for index, value in enumerate(headers) if str(value).strip()}
+
+    def mapped_value(row: list[str], key: str) -> str:
+        column = str(mapping.get(key) or "").strip()
+        index = header_lookup.get(column)
+        if index is None or index >= len(row):
+            return ""
+        return str(row[index]).strip()
+
+    if not mapping.get("full_name_column") and not (
+        mapping.get("first_name_column") and mapping.get("last_name_column")
+    ):
+        raise ValueError("Map either a full name column or both first and last name columns")
+
+    slips = parse_packing_slips(packing_slips_pdf)
+    groups = group_slip_pages(slips)
+    unused = set(range(len(groups)))
+    ordered_group_indices: list[int] = []
+    matched_order_sequences: dict[str, int] = {}
+    report_rows = []
+
+    for spreadsheet_row, row in enumerate(rows[header_row:], start=header_row + 1):
+        full_name = mapped_value(row, "full_name_column")
+        first_name = mapped_value(row, "first_name_column")
+        last_name = mapped_value(row, "last_name_column")
+        spreadsheet_name_value = full_name or " ".join(value for value in (first_name, last_name) if value)
+        spreadsheet_order = re.sub(r"\D", "", mapped_value(row, "order_number_column"))
+        match_index: int | None = None
+        method = ""
+
+        if spreadsheet_order and spreadsheet_order in matched_order_sequences:
+            report_rows.append({
+                "spreadsheet_row": spreadsheet_row,
+                "status": "duplicate_spreadsheet_order",
+                "match_method": "order_number",
+                "spreadsheet_name": spreadsheet_name_value,
+                "spreadsheet_order_number": spreadsheet_order,
+                "slip_name": "",
+                "slip_order_number": spreadsheet_order,
+                "output_sequence": matched_order_sequences[spreadsheet_order],
+            })
+            continue
+
+        if spreadsheet_order:
+            match_index = next(
+                (
+                    index
+                    for index in unused
+                    if groups[index][0].order_number == spreadsheet_order
+                ),
+                None,
+            )
+            if match_index is not None:
+                method = "order_number"
+
+        if match_index is None and spreadsheet_name_value:
+            target = person_name_key(spreadsheet_name_value)
+            match_index = next(
+                (
+                    index
+                    for index in unused
+                    if target
+                    and target
+                    in {
+                        person_name_key(groups[index][0].shipping_name),
+                        person_name_key(groups[index][0].customer_name),
+                    }
+                ),
+                None,
+            )
+            if match_index is not None:
+                method = "name"
+
+        if match_index is None:
+            report_rows.append({
+                "spreadsheet_row": spreadsheet_row,
+                "status": "spreadsheet_row_unmatched",
+                "match_method": "",
+                "spreadsheet_name": spreadsheet_name_value,
+                "spreadsheet_order_number": spreadsheet_order,
+                "slip_name": "",
+                "slip_order_number": "",
+                "output_sequence": "",
+            })
+            continue
+
+        unused.remove(match_index)
+        ordered_group_indices.append(match_index)
+        slip = groups[match_index][0]
+        if slip.order_number:
+            matched_order_sequences[slip.order_number] = len(ordered_group_indices)
+        report_rows.append({
+            "spreadsheet_row": spreadsheet_row,
+            "status": "matched",
+            "match_method": method,
+            "spreadsheet_name": spreadsheet_name_value,
+            "spreadsheet_order_number": spreadsheet_order,
+            "slip_name": slip.shipping_name or slip.customer_name,
+            "slip_order_number": slip.order_number,
+            "output_sequence": len(ordered_group_indices),
+        })
+
+    unmatched_group_indices = sorted(unused)
+    ordered_group_indices.extend(unmatched_group_indices)
+    for index in unmatched_group_indices:
+        slip = groups[index][0]
+        report_rows.append({
+            "spreadsheet_row": "",
+            "status": "slip_not_in_spreadsheet",
+            "match_method": "",
+            "spreadsheet_name": "",
+            "spreadsheet_order_number": "",
+            "slip_name": slip.shipping_name or slip.customer_name,
+            "slip_order_number": slip.order_number,
+            "output_sequence": ordered_group_indices.index(index) + 1,
+        })
+
+    ordered_groups = [groups[index] for index in ordered_group_indices]
+    sorted_slips_pdf = out_dir / "spreadsheet_sequence_packing_slips.pdf"
+    write_selected_pages(
+        packing_slips_pdf,
+        sorted_slips_pdf,
+        [page.page_index for group in ordered_groups for page in group],
+    )
+    outputs = {"spreadsheet_sequence_packing_slips": sorted_slips_pdf}
+
+    labels, label_sources = parse_label_pdfs(label_pdfs)
+    selected, label_report = match_labels_to_slips([group[0] for group in ordered_groups], labels)
+    sorted_labels_pdf = out_dir / "spreadsheet_sequence_shipping_labels.pdf"
+    write_sorted_labels(label_sources, sorted_labels_pdf, selected)
+    outputs["spreadsheet_sequence_shipping_labels"] = sorted_labels_pdf
+
+    match_report = out_dir / "spreadsheet_sequence_match_report.csv"
+    pd.DataFrame(report_rows).to_csv(match_report, index=False)
+    outputs["spreadsheet_sequence_match_report"] = match_report
+    label_report_path = out_dir / "spreadsheet_sequence_label_report.csv"
+    label_report.to_csv(label_report_path, index=False)
+    outputs["spreadsheet_sequence_label_report"] = label_report_path
+    return outputs
+
+
+def process_batch(
+    packing_slips_pdf: str | Path,
+    label_pdfs: list[str | Path],
+    out_dir: str | Path,
+    preset: str,
+    sort_fields: list[str] | None = None,
+    spreadsheet_path: str | Path | None = None,
+    spreadsheet_name: str = "",
+    spreadsheet_mapping: dict | None = None,
+) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, Path] = {}
@@ -746,6 +1006,20 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
 
     if preset == "split_required_field":
         outputs.update(split_packing_slips_by_required_field(packing_slips_pdf, out_dir))
+
+    if preset == "spreadsheet_sequence":
+        if not spreadsheet_path or not spreadsheet_mapping:
+            raise ValueError("Spreadsheet and column mapping are required")
+        outputs.update(
+            sort_to_spreadsheet_sequence(
+                packing_slips_pdf,
+                label_pdfs,
+                spreadsheet_path,
+                spreadsheet_name,
+                spreadsheet_mapping,
+                out_dir,
+            )
+        )
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:

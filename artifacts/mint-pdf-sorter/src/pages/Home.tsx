@@ -10,6 +10,7 @@ import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ProcessInputPreset, OutputFile } from "@workspace/api-client-react";
 import { CustomSortBuilder } from "@/components/CustomSortBuilder";
+import { SpreadsheetMapping, type SpreadsheetColumnMapping } from "@/components/SpreadsheetMapping";
 
 async function triggerDownload(url: string, filename: string) {
   const response = await fetch(url);
@@ -31,15 +32,19 @@ export default function Home() {
   const [sortFields, setSortFields] = useState<string[]>([]);
   const [packingSlips, setPackingSlips] = useState<File[]>([]);
   const [labels, setLabels] = useState<File[]>([]);
+  const [spreadsheet, setSpreadsheet] = useState<File[]>([]);
+  const [spreadsheetMapping, setSpreadsheetMapping] = useState<SpreadsheetColumnMapping | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
 
   const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field", "split_required_field"].includes(preset);
-  const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels"].includes(preset);
+  const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels", "spreadsheet_sequence"].includes(preset);
+  const needsSpreadsheet = preset === "spreadsheet_sequence";
+  const needsPackingSlipsForPreset = needsPackingSlips || needsSpreadsheet;
 
   const handleProcess = async () => {
-    if (needsPackingSlips && packingSlips.length === 0) {
+    if (needsPackingSlipsForPreset && packingSlips.length === 0) {
       setError("Packing slips are required for this preset.");
       return;
     }
@@ -50,6 +55,20 @@ export default function Home() {
     if (preset === "custom_sort" && sortFields.length === 0) {
       setError("Add at least one sort field before processing.");
       return;
+    }
+    if (needsSpreadsheet) {
+      if (spreadsheet.length === 0 || !spreadsheetMapping) {
+        setError("Upload the sequence spreadsheet and map its columns.");
+        return;
+      }
+      const hasNameMapping = Boolean(
+        spreadsheetMapping.full_name_column
+        || (spreadsheetMapping.first_name_column && spreadsheetMapping.last_name_column),
+      );
+      if (!hasNameMapping) {
+        setError("Map a full-name column, or both first and last name columns.");
+        return;
+      }
     }
 
     setError(null);
@@ -63,8 +82,12 @@ export default function Home() {
       if (preset === "custom_sort") {
         formData.append("sort_fields", JSON.stringify(sortFields));
       }
+      if (needsSpreadsheet && spreadsheet[0] && spreadsheetMapping) {
+        formData.append("spreadsheet", spreadsheet[0]);
+        formData.append("spreadsheet_mapping", JSON.stringify(spreadsheetMapping));
+      }
       
-      if (needsPackingSlips && packingSlips[0]) {
+      if (needsPackingSlipsForPreset && packingSlips[0]) {
         formData.append("packing_slips", packingSlips[0]);
       }
       
@@ -103,6 +126,8 @@ export default function Home() {
   const handleReset = () => {
     setPackingSlips([]);
     setLabels([]);
+    setSpreadsheet([]);
+    setSpreadsheetMapping(null);
     setResults(null);
     setError(null);
   };
@@ -147,6 +172,7 @@ export default function Home() {
                   <SelectItem value="custom_sort">Custom Sort (Build Your Own)</SelectItem>
                   <SelectItem value="required_field">Sort packing slips (Required Field: Birth Year Oldest to Recent)</SelectItem>
                   <SelectItem value="split_required_field">Create batches by Required Field (Birth Year)</SelectItem>
+                  <SelectItem value="spreadsheet_sequence">Sort slips & labels to spreadsheet sequence</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -165,7 +191,7 @@ export default function Home() {
                 </motion.div>
               )}
 
-              {needsPackingSlips && (
+              {needsPackingSlipsForPreset && (
                 <motion.div
                   key="packing-slips"
                   initial={{ opacity: 0, height: 0 }}
@@ -185,6 +211,24 @@ export default function Home() {
                     onFilesAccepted={(files) => setPackingSlips([files[0]])}
                     onFileRemoved={() => setPackingSlips([])}
                     label="Only PDF files are supported"
+                  />
+                </motion.div>
+              )}
+
+              {needsSpreadsheet && (
+                <motion.div
+                  key="spreadsheet"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-3"
+                >
+                  <Label>Sequence Spreadsheet</Label>
+                  <SpreadsheetMapping
+                    files={spreadsheet}
+                    onFilesChange={setSpreadsheet}
+                    mapping={spreadsheetMapping}
+                    onMappingChange={setSpreadsheetMapping}
                   />
                 </motion.div>
               )}
@@ -229,7 +273,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 onClick={handleReset}
-                disabled={isProcessing || (packingSlips.length === 0 && labels.length === 0 && !results)}
+                disabled={isProcessing || (packingSlips.length === 0 && labels.length === 0 && spreadsheet.length === 0 && !results)}
               >
                 Reset
               </Button>

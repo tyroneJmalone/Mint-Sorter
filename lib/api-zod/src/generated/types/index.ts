@@ -12,3 +12,6 @@ export * from './outputFile';
 export * from './processInput';
 export * from './processInputPreset';
 export * from './processResult';
+export * from './spreadsheetInspectInput';
+export * from './spreadsheetInspectResult';
+export * from './spreadsheetPreviewSheet';

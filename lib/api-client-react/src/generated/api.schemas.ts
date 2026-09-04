@@ -27,6 +27,7 @@ export const ProcessInputPreset = {
   custom_sort: 'custom_sort',
   required_field: 'required_field',
   split_required_field: 'split_required_field',
+  spreadsheet_sequence: 'spreadsheet_sequence',
 } as const;
 
 export interface ProcessInput {
@@ -34,6 +35,22 @@ export interface ProcessInput {
   preset: ProcessInputPreset;
   /** JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date */
   sort_fields?: string;
+  /** JSON column mapping used by the spreadsheet_sequence preset */
+  spreadsheet_mapping?: string;
+}
+
+export interface SpreadsheetInspectInput {
+  /** CSV or XLSX spreadsheet upload */
+  spreadsheet: string;
+}
+
+export interface SpreadsheetPreviewSheet {
+  name: string;
+  rows: string[][];
+}
+
+export interface SpreadsheetInspectResult {
+  sheets: SpreadsheetPreviewSheet[];
 }
 
 export interface OutputFile {

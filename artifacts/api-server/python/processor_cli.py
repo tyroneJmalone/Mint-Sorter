@@ -22,12 +22,19 @@ if __name__ == "__main__":
     parser.add_argument("packing_path", help="Path to packing slips PDF (empty string if not needed)")
     parser.add_argument("out_dir", help="Output directory")
     parser.add_argument("--sort-fields", default="[]", help="JSON array of sort field names for custom_sort preset")
+    parser.add_argument("--spreadsheet-path", default="", help="Path to CSV/XLSX sequence file")
+    parser.add_argument("--spreadsheet-name", default="", help="Original spreadsheet filename")
+    parser.add_argument("--spreadsheet-mapping", default="{}", help="JSON spreadsheet column mapping")
     parser.add_argument("labels", nargs="*", help="Paths to shipping label PDFs")
-    args = parser.parse_args()
+    args = parser.parse_intermixed_args()
 
     sort_fields: list[str] = json.loads(args.sort_fields) if args.sort_fields else []
+    spreadsheet_mapping: dict = json.loads(args.spreadsheet_mapping) if args.spreadsheet_mapping else {}
     packing = Path(args.packing_path) if args.packing_path else Path("")
     label_paths = [Path(p) for p in args.labels]
 
     process_batch(packing, label_paths, Path(args.out_dir), args.preset,
-                  sort_fields=sort_fields if sort_fields else None)
+                  sort_fields=sort_fields if sort_fields else None,
+                  spreadsheet_path=Path(args.spreadsheet_path) if args.spreadsheet_path else None,
+                  spreadsheet_name=args.spreadsheet_name,
+                  spreadsheet_mapping=spreadsheet_mapping if spreadsheet_mapping else None)

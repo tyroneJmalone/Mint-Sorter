@@ -23,7 +23,9 @@ import type {
   ApiError,
   HealthStatus,
   ProcessInput,
-  ProcessResult
+  ProcessResult,
+  SpreadsheetInspectInput,
+  SpreadsheetInspectResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -134,6 +136,9 @@ formData.append(`preset`, processInput.preset);
 if(processInput.sort_fields !== undefined) {
  formData.append(`sort_fields`, processInput.sort_fields);
  }
+if(processInput.spreadsheet_mapping !== undefined) {
+ formData.append(`spreadsheet_mapping`, processInput.spreadsheet_mapping);
+ }
 
   return customFetch<ProcessResult>(getProcessFilesUrl(),
   {
@@ -191,6 +196,79 @@ export const useProcessFiles = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getProcessFilesMutationOptions(options));
+    }
+
+export const getInspectSpreadsheetUrl = () => {
+
+
+
+
+  return `/api/spreadsheet/inspect`
+}
+
+/**
+ * @summary Preview spreadsheet sheets and rows for column mapping
+ */
+export const inspectSpreadsheet = async (spreadsheetInspectInput: SpreadsheetInspectInput, options?: RequestInit): Promise<SpreadsheetInspectResult> => {
+    const formData = new FormData();
+formData.append(`spreadsheet`, spreadsheetInspectInput.spreadsheet);
+
+  return customFetch<SpreadsheetInspectResult>(getInspectSpreadsheetUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getInspectSpreadsheetMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inspectSpreadsheet>>, TError,{data: BodyType<SpreadsheetInspectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inspectSpreadsheet>>, TError,{data: BodyType<SpreadsheetInspectInput>}, TContext> => {
+
+const mutationKey = ['inspectSpreadsheet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inspectSpreadsheet>>, {data: BodyType<SpreadsheetInspectInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  inspectSpreadsheet(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InspectSpreadsheetMutationResult = NonNullable<Awaited<ReturnType<typeof inspectSpreadsheet>>>
+    export type InspectSpreadsheetMutationBody = BodyType<SpreadsheetInspectInput>
+    export type InspectSpreadsheetMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Preview spreadsheet sheets and rows for column mapping
+ */
+export const useInspectSpreadsheet = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inspectSpreadsheet>>, TError,{data: BodyType<SpreadsheetInspectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inspectSpreadsheet>>,
+        TError,
+        {data: BodyType<SpreadsheetInspectInput>},
+        TContext
+      > => {
+      return useMutation(getInspectSpreadsheetMutationOptions(options));
     }
 
 export const getDownloadFileUrl = (jobId: string,

@@ -52,6 +52,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+
+  /spreadsheet/inspect:
+    post:
+      operationId: inspectSpreadsheet
+      tags: [process]
+      summary: Preview spreadsheet sheets and rows for column mapping
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/SpreadsheetInspectInput"
+      responses:
+        "200":
+          description: Spreadsheet preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpreadsheetInspectResult"
+        "400":
+          description: Spreadsheet could not be read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           description: Processing error
           content:
@@ -107,11 +132,44 @@ components:
       properties:
         preset:
           type: string
-          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels, custom_sort, required_field, split_required_field]
+          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels, custom_sort, required_field, split_required_field, spreadsheet_sequence]
           description: Processing preset
         sort_fields:
           type: string
           description: "JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date"
+        spreadsheet_mapping:
+          type: string
+          description: JSON column mapping used by the spreadsheet_sequence preset
+
+    SpreadsheetInspectInput:
+      type: object
+      required: [spreadsheet]
+      properties:
+        spreadsheet:
+          type: string
+          description: CSV or XLSX spreadsheet upload
+
+    SpreadsheetPreviewSheet:
+      type: object
+      required: [name, rows]
+      properties:
+        name:
+          type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+
+    SpreadsheetInspectResult:
+      type: object
+      required: [sheets]
+      properties:
+        sheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpreadsheetPreviewSheet"
 
     OutputFile:
       type: object

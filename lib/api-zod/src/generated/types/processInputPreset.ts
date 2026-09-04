@@ -24,4 +24,5 @@ export const ProcessInputPreset = {
   custom_sort: 'custom_sort',
   required_field: 'required_field',
   split_required_field: 'split_required_field',
+  spreadsheet_sequence: 'spreadsheet_sequence',
 } as const;
