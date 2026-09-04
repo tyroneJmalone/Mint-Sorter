@@ -26,6 +26,7 @@ export const ProcessInputPreset = {
   match_labels: 'match_labels',
   custom_sort: 'custom_sort',
   required_field: 'required_field',
+  split_required_field: 'split_required_field',
 } as const;
 
 export interface ProcessInput {

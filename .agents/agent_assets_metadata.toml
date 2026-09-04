@@ -42,3 +42,31 @@ mtime_ms = 1788235332761
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/fdee38ab-f5d6-4b03-9886-491953376600/728e83ed-af2f-42da-8435-b4b01142cab9"
 storage_version_token = "1788235363528171"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "3mt4F7wIyDV54QQffdMcX"
+uri = "file://examples/birth-year-batches/nashua_packing_slips_by_birth_year.zip"
+type = "unspecified"
+title = "Nashua packing slips by birth year"
+description = "ZIP containing one sequence-preserving PDF per detected birth year, an unknown-year PDF, and the batch manifest CSV."
+logical_id = "17a035a8-c624-44db-bb90-90dcc8f7c547"
+content_hash = "sha256:207ab49281c031936c17be91c2fdf34f81a63312f352ced4d822ba25c952686c"
+size = 2929344
+mtime_ms = 1788534347094
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/17a035a8-c624-44db-bb90-90dcc8f7c547/6cf4bc24-39a9-4b5f-8769-2d437dbaf85c"
+storage_version_token = "1788534452853423"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "PA2mV-fZS-qF_GeU-CAcn"
+uri = "file://examples/birth-year-batches/birth_year_batch_manifest.csv"
+type = "table"
+title = "Birth year batch manifest"
+description = "Order-by-order report showing source sequence, order number, extracted birth year, destination batch, source pages, and page count."
+logical_id = "88b9f7fd-fb39-4cd0-96e2-aa0c939fcc1a"
+content_hash = "sha256:035fa5c9ebc7579e25d45669a9b4d1af1924271ed92b7aefd3339a644f9d7ab7"
+size = 18287
+mtime_ms = 1788534347098
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/88b9f7fd-fb39-4cd0-96e2-aa0c939fcc1a/26ae72cd-91fd-4c30-9188-2676bd78d9ee"
+storage_version_token = "1788534453847159"
+content_type = "text/csv"

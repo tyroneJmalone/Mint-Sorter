@@ -178,6 +178,28 @@ def extract_required_field_from_page(page) -> str:
     return " ".join(rendered_lines)
 
 
+def _extract_birth_year(value: str) -> str:
+    """Extract a plausible birth year from a year or common full-date value."""
+    standalone_year = re.search(r"(?<!\d)((?:18|19|20)\d{2})(?!\d)", value)
+    if standalone_year:
+        return standalone_year.group(1)
+
+    digits = re.sub(r"\D", "", value)
+    # Compact MMDDYYYY or MDDYYYY values, such as 04062016.
+    if 7 <= len(digits) <= 8:
+        candidate = digits[-4:]
+        if re.fullmatch(r"(?:18|19|20)\d{2}", candidate):
+            return candidate
+
+    date_match = re.search(
+        r"(?<!\d)\d{1,2}[/-]\d{1,2}[/-](\d{2})(?!\d)",
+        value,
+    )
+    if date_match:
+        return str(2000 + int(date_match.group(1)))
+    return ""
+
+
 @dataclass
 class SlipPage:
     page_index: int
@@ -227,9 +249,9 @@ class SlipPage:
     def sort_key_required_field(self):
         # Birth years sort chronologically, oldest first. Slips without a
         # recognizable year are kept after slips with a valid year.
-        match = re.search(r"(?<!\d)(?:18|19|20)\d{2}(?!\d)", self.required_field_value)
-        if match:
-            return (0, int(match.group(0)), self.page_index)
+        birth_year = _extract_birth_year(self.required_field_value)
+        if birth_year:
+            return (0, int(birth_year), self.page_index)
         return (1, 9999, norm_text(self.required_field_value), self.page_index)
 
     def sort_value_for_field(self, field: str):
@@ -609,6 +631,51 @@ def _write_custom_field_report(sorted_groups: list[list[SlipPage]], report_csv: 
     pd.DataFrame(rows).to_csv(report_csv, index=False)
 
 
+def split_packing_slips_by_required_field(
+    input_pdf: str | Path,
+    out_dir: Path,
+) -> dict[str, Path]:
+    """
+    Split a packing-slip PDF into one PDF per birth year without re-sorting it.
+
+    Orders remain whole, and their relative sequence within each generated batch
+    is identical to their sequence in the source PDF.
+    """
+    slips = parse_packing_slips(input_pdf)
+    groups = group_slip_pages(slips)
+    batches: dict[str, list[list[SlipPage]]] = {}
+    manifest_rows = []
+
+    for source_sequence, group in enumerate(groups, start=1):
+        first = group[0]
+        birth_year = _extract_birth_year(first.required_field_value)
+        batch_value = birth_year or "unknown"
+        batches.setdefault(batch_value, []).append(group)
+        manifest_rows.append({
+            "source_sequence": source_sequence,
+            "order_number": first.order_number,
+            "birth_year": birth_year,
+            "required_field_value": first.required_field_value,
+            "batch": batch_value,
+            "source_pages": ", ".join(str(page.page_index + 1) for page in group),
+            "page_count": len(group),
+        })
+
+    outputs: dict[str, Path] = {}
+    for batch_value in sorted(batches, key=lambda value: (value == "unknown", value)):
+        batch_groups = batches[batch_value]
+        filename = f"packing_slips_birth_year_{batch_value}.pdf"
+        output_pdf = out_dir / filename
+        page_indices = [page.page_index for group in batch_groups for page in group]
+        write_selected_pages(input_pdf, output_pdf, page_indices)
+        outputs[f"birth_year_{batch_value}"] = output_pdf
+
+    manifest_path = out_dir / "birth_year_batch_manifest.csv"
+    pd.DataFrame(manifest_rows).to_csv(manifest_path, index=False)
+    outputs["birth_year_batch_manifest"] = manifest_path
+    return outputs
+
+
 def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], out_dir: str | Path, preset: str, sort_fields: list[str] | None = None) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -676,6 +743,9 @@ def process_batch(packing_slips_pdf: str | Path, label_pdfs: list[str | Path], o
         report_csv = out_dir / "required_field_report.csv"
         _write_custom_sort_report(sorted_groups, report_csv)
         outputs["required_field_report"] = report_csv
+
+    if preset == "split_required_field":
+        outputs.update(split_packing_slips_by_required_field(packing_slips_pdf, out_dir))
 
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:

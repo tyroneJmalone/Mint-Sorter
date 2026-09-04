@@ -35,7 +35,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
 
-  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field"].includes(preset);
+  const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field", "split_required_field"].includes(preset);
   const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels"].includes(preset);
 
   const handleProcess = async () => {
@@ -146,6 +146,7 @@ export default function Home() {
                   <SelectItem value="match_labels">Sort labels to existing packing slip order (no slip sorting)</SelectItem>
                   <SelectItem value="custom_sort">Custom Sort (Build Your Own)</SelectItem>
                   <SelectItem value="required_field">Sort packing slips (Required Field: Birth Year Oldest to Recent)</SelectItem>
+                  <SelectItem value="split_required_field">Create batches by Required Field (Birth Year)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -173,6 +174,11 @@ export default function Home() {
                   className="space-y-3"
                 >
                   <Label>Packing Slips (Single PDF)</Label>
+                  {preset === "split_required_field" && (
+                    <p className="text-sm text-muted-foreground">
+                      Creates one PDF per birth year without changing the order sequence or page formatting.
+                    </p>
+                  )}
                   <FileDropzone
                     multiple={false}
                     files={packingSlips}

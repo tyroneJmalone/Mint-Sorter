@@ -34,8 +34,36 @@ const OUTPUT_LABELS: Record<string, string> = {
   custom_field_report: "Download custom field report CSV",
   custom_sort_report: "Download sort report CSV",
   required_field_report: "Download required field report CSV",
-  zip: "Download all outputs (ZIP)",
+  birth_year_batch_manifest: "Download birth year batch manifest CSV",
+  mint_pdf_sorter_outputs: "Download all birth year batches (ZIP)",
 };
+
+const VALID_PRESETS = [
+  "combine_labels",
+  "sort_slips",
+  "sort_slips_name",
+  "sort_slips_custom",
+  "sort_slips_custom_first",
+  "sort_labels",
+  "sort_both",
+  "match_labels",
+  "custom_sort",
+  "required_field",
+  "split_required_field",
+] as const;
+
+const PACKING_SLIP_PRESETS = [
+  "sort_slips",
+  "sort_slips_name",
+  "sort_slips_custom",
+  "sort_slips_custom_first",
+  "sort_labels",
+  "sort_both",
+  "match_labels",
+  "custom_sort",
+  "required_field",
+  "split_required_field",
+];
 
 router.post(
   "/process",
@@ -45,7 +73,7 @@ router.post(
   ]),
   async (req, res): Promise<void> => {
     const preset = req.body?.preset as string | undefined;
-    if (!preset || !["combine_labels", "sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field"].includes(preset)) {
+    if (!preset || !VALID_PRESETS.includes(preset as (typeof VALID_PRESETS)[number])) {
       res.status(400).json({ error: "Invalid or missing preset" });
       return;
     }
@@ -69,7 +97,7 @@ router.post(
     const packingFiles = files?.["packing_slips"] ?? [];
     const labelFiles = files?.["labels"] ?? [];
 
-    if (["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field"].includes(preset) && packingFiles.length === 0) {
+    if (PACKING_SLIP_PRESETS.includes(preset) && packingFiles.length === 0) {
       res.status(400).json({ error: "Packing slips PDF is required for this preset" });
       return;
     }
@@ -125,7 +153,10 @@ router.post(
       const ext = path.extname(filename);
       const key = path.basename(filename, ext);
       const mime = mimeForExt(ext);
-      const label = OUTPUT_LABELS[key] ?? `Download ${filename}`;
+      const birthYear = key.match(/^packing_slips_birth_year_(\d{4}|unknown)$/)?.[1];
+      const label = birthYear
+        ? `Download ${birthYear === "unknown" ? "unknown birth year" : `birth year ${birthYear}`} batch PDF`
+        : OUTPUT_LABELS[key] ?? `Download ${filename}`;
       jobFiles.set(key, {
         filepath: path.join(outDir, filename),
         filename,
@@ -148,8 +179,14 @@ router.post(
       mime: info.mime,
     }));
 
-    // Put zip last, sort others first
-    outputs.sort((a, b) => (a.key === "zip" ? 1 : b.key === "zip" ? -1 : 0));
+    // Put the all-outputs ZIP last.
+    outputs.sort((a, b) =>
+      a.key === "mint_pdf_sorter_outputs"
+        ? 1
+        : b.key === "mint_pdf_sorter_outputs"
+          ? -1
+          : 0
+    );
 
     req.log.info({ jobId, outputCount: outputs.length }, "Processing complete");
     res.json({ jobId, outputs });
