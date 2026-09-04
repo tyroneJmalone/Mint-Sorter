@@ -35,12 +35,6 @@ def norm_name(s: str | None) -> str:
     return " ".join(t for t in s.split() if t not in stop)
 
 
-def person_name_key(s: str | None) -> str:
-    """Normalize First Last, Last First, and Last, First into the same key."""
-    tokens = [token for token in norm_name(s).split() if len(token) > 1]
-    return " ".join(sorted(tokens))
-
-
 def _column_index(cell_reference: str) -> int:
     letters = re.match(r"[A-Z]+", cell_reference.upper())
     if not letters:
@@ -795,10 +789,8 @@ def sort_to_spreadsheet_sequence(
             return ""
         return str(row[index]).strip()
 
-    if not mapping.get("full_name_column") and not (
-        mapping.get("first_name_column") and mapping.get("last_name_column")
-    ):
-        raise ValueError("Map either a full name column or both first and last name columns")
+    if not mapping.get("order_number_column"):
+        raise ValueError("Map the spreadsheet order number column")
 
     slips = parse_packing_slips(packing_slips_pdf)
     groups = group_slip_pages(slips)
@@ -808,10 +800,6 @@ def sort_to_spreadsheet_sequence(
     report_rows = []
 
     for spreadsheet_row, row in enumerate(rows[header_row:], start=header_row + 1):
-        full_name = mapped_value(row, "full_name_column")
-        first_name = mapped_value(row, "first_name_column")
-        last_name = mapped_value(row, "last_name_column")
-        spreadsheet_name_value = full_name or " ".join(value for value in (first_name, last_name) if value)
         spreadsheet_order = re.sub(r"\D", "", mapped_value(row, "order_number_column"))
         match_index: int | None = None
         method = ""
@@ -821,7 +809,6 @@ def sort_to_spreadsheet_sequence(
                 "spreadsheet_row": spreadsheet_row,
                 "status": "duplicate_spreadsheet_order",
                 "match_method": "order_number",
-                "spreadsheet_name": spreadsheet_name_value,
                 "spreadsheet_order_number": spreadsheet_order,
                 "slip_name": "",
                 "slip_order_number": spreadsheet_order,
@@ -841,30 +828,11 @@ def sort_to_spreadsheet_sequence(
             if match_index is not None:
                 method = "order_number"
 
-        if match_index is None and spreadsheet_name_value:
-            target = person_name_key(spreadsheet_name_value)
-            match_index = next(
-                (
-                    index
-                    for index in unused
-                    if target
-                    and target
-                    in {
-                        person_name_key(groups[index][0].shipping_name),
-                        person_name_key(groups[index][0].customer_name),
-                    }
-                ),
-                None,
-            )
-            if match_index is not None:
-                method = "name"
-
         if match_index is None:
             report_rows.append({
                 "spreadsheet_row": spreadsheet_row,
                 "status": "spreadsheet_row_unmatched",
                 "match_method": "",
-                "spreadsheet_name": spreadsheet_name_value,
                 "spreadsheet_order_number": spreadsheet_order,
                 "slip_name": "",
                 "slip_order_number": "",
@@ -881,7 +849,6 @@ def sort_to_spreadsheet_sequence(
             "spreadsheet_row": spreadsheet_row,
             "status": "matched",
             "match_method": method,
-            "spreadsheet_name": spreadsheet_name_value,
             "spreadsheet_order_number": spreadsheet_order,
             "slip_name": slip.shipping_name or slip.customer_name,
             "slip_order_number": slip.order_number,
@@ -896,7 +863,6 @@ def sort_to_spreadsheet_sequence(
             "spreadsheet_row": "",
             "status": "slip_not_in_spreadsheet",
             "match_method": "",
-            "spreadsheet_name": "",
             "spreadsheet_order_number": "",
             "slip_name": slip.shipping_name or slip.customer_name,
             "slip_order_number": slip.order_number,

@@ -58,15 +58,11 @@ export default function Home() {
     }
     if (needsSpreadsheet) {
       if (spreadsheet.length === 0 || !spreadsheetMapping) {
-        setError("Upload the sequence spreadsheet and map its columns.");
+        setError("Upload the sequence spreadsheet and map its order-number column.");
         return;
       }
-      const hasNameMapping = Boolean(
-        spreadsheetMapping.full_name_column
-        || (spreadsheetMapping.first_name_column && spreadsheetMapping.last_name_column),
-      );
-      if (!hasNameMapping) {
-        setError("Map a full-name column, or both first and last name columns.");
+      if (!spreadsheetMapping.order_number_column) {
+        setError("Map the spreadsheet order-number column.");
         return;
       }
     }
@@ -224,6 +220,9 @@ export default function Home() {
                   className="space-y-3"
                 >
                   <Label>Sequence Spreadsheet</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Spreadsheet order numbers set the packing-slip sequence. Shipping labels are then matched to that reordered slip sequence.
+                    </p>
                   <SpreadsheetMapping
                     files={spreadsheet}
                     onFilesChange={setSpreadsheet}

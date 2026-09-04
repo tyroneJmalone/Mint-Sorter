@@ -8,9 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export type SpreadsheetColumnMapping = {
   sheet_name: string;
   header_row: number;
-  full_name_column: string;
-  first_name_column: string;
-  last_name_column: string;
   order_number_column: string;
 };
 
@@ -61,9 +58,6 @@ export function SpreadsheetMapping({
       onMappingChange({
         sheet_name: firstSheet.name,
         header_row: 1,
-        full_name_column: suggestedColumn(headers, /^(full\s*)?name$/i),
-        first_name_column: suggestedColumn(headers, /first.*name|name.*first/i),
-        last_name_column: suggestedColumn(headers, /last.*name|name.*last/i),
         order_number_column: suggestedColumn(headers, /order.*(#|number|no)|(#|number|no).*order/i),
       });
     } catch (err) {
@@ -166,14 +160,11 @@ export function SpreadsheetMapping({
           <div>
             <p className="text-sm font-medium">Column mapping</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Map a full-name column, or map both first and last name. Order number is optional but preferred.
+              Select the order-number column. Its row sequence determines the packing-slip order.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {columnSelect("map-full-name", "Full name", mapping.full_name_column, (value) => update({ full_name_column: value }))}
-            {columnSelect("map-order-number", "Order number (optional)", mapping.order_number_column, (value) => update({ order_number_column: value }))}
-            {columnSelect("map-first-name", "First name", mapping.first_name_column, (value) => update({ first_name_column: value }))}
-            {columnSelect("map-last-name", "Last name", mapping.last_name_column, (value) => update({ last_name_column: value }))}
+          <div className="max-w-md">
+            {columnSelect("map-order-number", "Order number (required)", mapping.order_number_column, (value) => update({ order_number_column: value }))}
           </div>
 
           <div className="rounded-md bg-background border border-border px-3 py-2 text-xs text-muted-foreground">

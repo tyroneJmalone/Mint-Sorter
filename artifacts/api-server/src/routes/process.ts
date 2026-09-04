@@ -164,6 +164,16 @@ router.post(
       res.status(400).json({ error: "Spreadsheet and column mapping are required" });
       return;
     }
+    if (
+      preset === "spreadsheet_sequence"
+      && (
+        typeof spreadsheetMapping?.order_number_column !== "string"
+        || !spreadsheetMapping.order_number_column.trim()
+      )
+    ) {
+      res.status(400).json({ error: "Spreadsheet order-number column mapping is required" });
+      return;
+    }
 
     const jobId = randomUUID();
     const outDir = `/tmp/mint-jobs/${jobId}`;
