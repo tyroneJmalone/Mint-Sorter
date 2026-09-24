@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from processor import process_batch  # type: ignore
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Mint PDF Sorter CLI")
+    parser = argparse.ArgumentParser(description="Mint Sorter & Parser CLI")
     parser.add_argument("preset", help="Processing preset name")
     parser.add_argument("packing_path", help="Path to packing slips PDF (empty string if not needed)")
     parser.add_argument("out_dir", help="Output directory")

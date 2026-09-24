@@ -1105,7 +1105,7 @@ def process_batch(
         report.to_csv(report_csv, index=False)
         outputs["match_report"] = report_csv
 
-    zip_path = out_dir / "mint_pdf_sorter_outputs.zip"
+    zip_path = out_dir / "mint_sorter_parser_outputs.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for name, path in outputs.items():
             z.write(path, arcname=path.name)

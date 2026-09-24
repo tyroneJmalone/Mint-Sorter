@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: Mint PDF Sorter API
+  description: Mint Sorter & Parser API
 servers:
   - url: /api
     description: Base API path
@@ -31,8 +31,8 @@ paths:
     post:
       operationId: processFiles
       tags: [process]
-      summary: Process packing slips and shipping labels
-      description: Upload PDF files (multipart/form-data) with a preset; returns a job ID and output file list
+      summary: Sort PDF files or parse store export CSV files
+      description: Upload files (multipart/form-data) with a preset; returns a job ID and output file list
       requestBody:
         required: true
         content:
@@ -132,7 +132,7 @@ components:
       properties:
         preset:
           type: string
-          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels, custom_sort, required_field, split_required_field, spreadsheet_sequence]
+          enum: [combine_labels, sort_slips, sort_slips_name, sort_slips_custom, sort_slips_custom_first, sort_labels, sort_both, match_labels, custom_sort, required_field, split_required_field, spreadsheet_sequence, parse_store_export]
           description: Processing preset
         sort_fields:
           type: string
@@ -140,6 +140,9 @@ components:
         spreadsheet_mapping:
           type: string
           description: JSON column mapping used by the spreadsheet_sequence preset
+        remove_column_indexes:
+          type: string
+          description: JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset
 
     SpreadsheetInspectInput:
       type: object

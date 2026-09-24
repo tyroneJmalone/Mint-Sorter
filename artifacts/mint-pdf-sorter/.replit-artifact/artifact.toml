@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Mint PDF Sorter"
+title = "Mint Sorter & Parser"
 version = "1.0.0"
 id = "artifacts/mint-pdf-sorter"
 router = "path"

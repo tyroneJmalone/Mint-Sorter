@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ProcessInputPreset, OutputFile } from "@workspace/api-client-react";
 import { CustomSortBuilder } from "@/components/CustomSortBuilder";
 import { SpreadsheetMapping, type SpreadsheetColumnMapping } from "@/components/SpreadsheetMapping";
+import { StoreExportParser } from "@/components/StoreExportParser";
 
 async function triggerDownload(url: string, filename: string) {
   const response = await fetch(url);
@@ -34,6 +35,8 @@ export default function Home() {
   const [labels, setLabels] = useState<File[]>([]);
   const [spreadsheet, setSpreadsheet] = useState<File[]>([]);
   const [spreadsheetMapping, setSpreadsheetMapping] = useState<SpreadsheetColumnMapping | null>(null);
+  const [storeExport, setStoreExport] = useState<File[]>([]);
+  const [additionalDropIndexes, setAdditionalDropIndexes] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
@@ -41,6 +44,7 @@ export default function Home() {
   const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field", "split_required_field"].includes(preset);
   const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels", "spreadsheet_sequence"].includes(preset);
   const needsSpreadsheet = preset === "spreadsheet_sequence";
+  const needsStoreExport = preset === "parse_store_export";
   const needsPackingSlipsForPreset = needsPackingSlips || needsSpreadsheet;
 
   const handleProcess = async () => {
@@ -66,6 +70,10 @@ export default function Home() {
         return;
       }
     }
+    if (needsStoreExport && storeExport.length === 0) {
+      setError("Upload a store export CSV.");
+      return;
+    }
 
     setError(null);
     setIsProcessing(true);
@@ -81,6 +89,10 @@ export default function Home() {
       if (needsSpreadsheet && spreadsheet[0] && spreadsheetMapping) {
         formData.append("spreadsheet", spreadsheet[0]);
         formData.append("spreadsheet_mapping", JSON.stringify(spreadsheetMapping));
+      }
+      if (needsStoreExport && storeExport[0]) {
+        formData.append("store_export", storeExport[0]);
+        formData.append("remove_column_indexes", JSON.stringify(additionalDropIndexes));
       }
       
       if (needsPackingSlipsForPreset && packingSlips[0]) {
@@ -124,6 +136,8 @@ export default function Home() {
     setLabels([]);
     setSpreadsheet([]);
     setSpreadsheetMapping(null);
+    setStoreExport([]);
+    setAdditionalDropIndexes([]);
     setResults(null);
     setError(null);
   };
@@ -132,9 +146,9 @@ export default function Home() {
     <div className="min-h-screen bg-background py-10 px-4 md:px-8 flex flex-col items-center">
       <div className="w-full max-w-4xl space-y-8">
         <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Mint PDF Sorter</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Mint Sorter &amp; Parser</h1>
           <p className="text-muted-foreground">
-            Sort, combine, and match packing slips with shipping labels.
+            Sort and match PDFs, or clean common store exports.
           </p>
         </div>
 
@@ -169,6 +183,7 @@ export default function Home() {
                   <SelectItem value="required_field">Sort packing slips (Required Field: Birth Year Oldest to Recent)</SelectItem>
                   <SelectItem value="split_required_field">Create batches by Required Field (Birth Year)</SelectItem>
                   <SelectItem value="spreadsheet_sequence">Sort slips & labels to spreadsheet sequence</SelectItem>
+                  <SelectItem value="parse_store_export">Parse store export (remove columns)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -232,6 +247,24 @@ export default function Home() {
                 </motion.div>
               )}
 
+              {needsStoreExport && (
+                <motion.div
+                  key="store-export"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-3"
+                >
+                  <Label>Store Export CSV</Label>
+                  <StoreExportParser
+                    files={storeExport}
+                    onFilesChange={setStoreExport}
+                    additionalDropIndexes={additionalDropIndexes}
+                    onAdditionalDropIndexesChange={setAdditionalDropIndexes}
+                  />
+                </motion.div>
+              )}
+
               {needsLabels && (
                 <motion.div
                   key="labels"
@@ -272,7 +305,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 onClick={handleReset}
-                disabled={isProcessing || (packingSlips.length === 0 && labels.length === 0 && spreadsheet.length === 0 && !results)}
+                disabled={isProcessing || (packingSlips.length === 0 && labels.length === 0 && spreadsheet.length === 0 && storeExport.length === 0 && !results)}
               >
                 Reset
               </Button>

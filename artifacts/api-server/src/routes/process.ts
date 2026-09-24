@@ -41,7 +41,7 @@ const OUTPUT_LABELS: Record<string, string> = {
   spreadsheet_sequence_match_report: "Download spreadsheet match report CSV",
   spreadsheet_sequence_label_report: "Download shipping label match report CSV",
   parsed_store_export: "Download parsed store export CSV",
-  mint_pdf_sorter_outputs: "Download all outputs (ZIP)",
+  mint_sorter_parser_outputs: "Download all outputs (ZIP)",
 };
 
 const VALID_PRESETS = [
@@ -276,7 +276,7 @@ router.post(
       const birthYear = key.match(/^packing_slips_birth_year_(\d{4}|unknown)$/)?.[1];
       const label = birthYear
         ? `Download ${birthYear === "unknown" ? "unknown birth year" : `birth year ${birthYear}`} batch PDF`
-        : key === "mint_pdf_sorter_outputs" && preset === "split_required_field"
+        : key === "mint_sorter_parser_outputs" && preset === "split_required_field"
           ? "Download all birth year batches (ZIP)"
           : OUTPUT_LABELS[key] ?? `Download ${filename}`;
       jobFiles.set(key, {
@@ -303,9 +303,9 @@ router.post(
 
     // Put the all-outputs ZIP last.
     outputs.sort((a, b) =>
-      a.key === "mint_pdf_sorter_outputs"
+      a.key === "mint_sorter_parser_outputs"
         ? 1
-        : b.key === "mint_pdf_sorter_outputs"
+        : b.key === "mint_sorter_parser_outputs"
           ? -1
           : 0
     );
