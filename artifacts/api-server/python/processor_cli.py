@@ -25,11 +25,14 @@ if __name__ == "__main__":
     parser.add_argument("--spreadsheet-path", default="", help="Path to CSV/XLSX sequence file")
     parser.add_argument("--spreadsheet-name", default="", help="Original spreadsheet filename")
     parser.add_argument("--spreadsheet-mapping", default="{}", help="JSON spreadsheet column mapping")
+    parser.add_argument("--store-export-path", default="", help="Path to store export CSV")
+    parser.add_argument("--remove-column-indexes", default="[]", help="JSON array of extra CSV column indexes to remove")
     parser.add_argument("labels", nargs="*", help="Paths to shipping label PDFs")
     args = parser.parse_intermixed_args()
 
     sort_fields: list[str] = json.loads(args.sort_fields) if args.sort_fields else []
     spreadsheet_mapping: dict = json.loads(args.spreadsheet_mapping) if args.spreadsheet_mapping else {}
+    remove_column_indexes: list[int] = json.loads(args.remove_column_indexes) if args.remove_column_indexes else []
     packing = Path(args.packing_path) if args.packing_path else Path("")
     label_paths = [Path(p) for p in args.labels]
 
@@ -37,4 +40,6 @@ if __name__ == "__main__":
                   sort_fields=sort_fields if sort_fields else None,
                   spreadsheet_path=Path(args.spreadsheet_path) if args.spreadsheet_path else None,
                   spreadsheet_name=args.spreadsheet_name,
-                  spreadsheet_mapping=spreadsheet_mapping if spreadsheet_mapping else None)
+                  spreadsheet_mapping=spreadsheet_mapping if spreadsheet_mapping else None,
+                  store_export_path=Path(args.store_export_path) if args.store_export_path else None,
+                  remove_column_indexes=remove_column_indexes)

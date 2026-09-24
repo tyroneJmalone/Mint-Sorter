@@ -40,6 +40,7 @@ const OUTPUT_LABELS: Record<string, string> = {
   spreadsheet_sequence_shipping_labels: "Download spreadsheet-sequenced shipping labels PDF",
   spreadsheet_sequence_match_report: "Download spreadsheet match report CSV",
   spreadsheet_sequence_label_report: "Download shipping label match report CSV",
+  parsed_store_export: "Download parsed store export CSV",
   mint_pdf_sorter_outputs: "Download all outputs (ZIP)",
 };
 
@@ -56,6 +57,7 @@ const VALID_PRESETS = [
   "required_field",
   "split_required_field",
   "spreadsheet_sequence",
+  "parse_store_export",
 ] as const;
 
 const PACKING_SLIP_PRESETS = [
@@ -110,6 +112,7 @@ router.post(
     { name: "packing_slips", maxCount: 1 },
     { name: "labels", maxCount: 20 },
     { name: "spreadsheet", maxCount: 1 },
+    { name: "store_export", maxCount: 1 },
   ]),
   async (req, res): Promise<void> => {
     const preset = req.body?.preset as string | undefined;
@@ -147,6 +150,7 @@ router.post(
     const packingFiles = files?.["packing_slips"] ?? [];
     const labelFiles = files?.["labels"] ?? [];
     const spreadsheetFiles = files?.["spreadsheet"] ?? [];
+    const storeExportFiles = files?.["store_export"] ?? [];
 
     if (PACKING_SLIP_PRESETS.includes(preset) && packingFiles.length === 0) {
       res.status(400).json({ error: "Packing slips PDF is required for this preset" });
@@ -174,6 +178,33 @@ router.post(
       res.status(400).json({ error: "Spreadsheet order-number column mapping is required" });
       return;
     }
+    let removeColumnIndexes: number[] = [];
+    if (preset === "parse_store_export") {
+      const rawIndexes = req.body?.remove_column_indexes as string | undefined;
+      if (rawIndexes) {
+        try {
+          const parsed = JSON.parse(rawIndexes) as unknown;
+          if (
+            !Array.isArray(parsed)
+            || parsed.some((index) => !Number.isInteger(index) || index < 0)
+          ) {
+            throw new Error("Expected a JSON array of non-negative column indexes");
+          }
+          removeColumnIndexes = Array.from(new Set(parsed as number[]));
+        } catch (err) {
+          res.status(400).json({ error: `Invalid remove_column_indexes: ${(err as Error).message}` });
+          return;
+        }
+      }
+      if (storeExportFiles.length === 0) {
+        res.status(400).json({ error: "Store export CSV is required for this preset" });
+        return;
+      }
+      if (!storeExportFiles[0].originalname.toLowerCase().endsWith(".csv")) {
+        res.status(400).json({ error: "Store export must be a CSV file" });
+        return;
+      }
+    }
 
     const jobId = randomUUID();
     const outDir = `/tmp/mint-jobs/${jobId}`;
@@ -183,6 +214,7 @@ router.post(
     const packingPath = packingFiles[0]?.path ?? "";
     const labelPaths = labelFiles.map((f) => f.path);
     const spreadsheetFile = spreadsheetFiles[0];
+    const storeExportFile = storeExportFiles[0];
 
     const args = [
       processorScript,
@@ -198,6 +230,14 @@ router.post(
             spreadsheetFile.originalname,
             "--spreadsheet-mapping",
             JSON.stringify(spreadsheetMapping),
+          ]
+        : []),
+      ...(storeExportFile
+        ? [
+            "--store-export-path",
+            storeExportFile.path,
+            "--remove-column-indexes",
+            JSON.stringify(removeColumnIndexes),
           ]
         : []),
       ...labelPaths,
@@ -250,7 +290,7 @@ router.post(
     jobs.set(jobId, jobFiles);
 
     // Clean up uploads
-    [...packingFiles, ...labelFiles, ...spreadsheetFiles].forEach((f) => {
+    [...packingFiles, ...labelFiles, ...spreadsheetFiles, ...storeExportFiles].forEach((f) => {
       try { fs.unlinkSync(f.path); } catch { /* ignore */ }
     });
 

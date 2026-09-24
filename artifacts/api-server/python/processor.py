@@ -18,6 +18,27 @@ from pypdf import PdfReader, PdfWriter
 SHEET_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 REL_NS = {"r": "http://schemas.openxmlformats.org/package/2006/relationships"}
 OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+STORE_EXPORT_DEFAULT_DROP_COLUMNS = {
+    "Dealer Name",
+    "Organization County",
+    "Catalog Sales Id",
+    "Sales Id",
+    "Status",
+    "Ship Country",
+    "Ship Country Code",
+    "Product Status",
+    "Event Product ID",
+    "Sub Category",
+    "Product Image URL",
+    "Product UPC",
+    "Tax Total",
+    "Salesperson Id",
+    "Salesperson External Id",
+    "BatchID",
+    "External Organization ID",
+    "External Organization Branch ID",
+    "Batch Standalone",
+}
 
 
 def norm_text(s: str | None) -> str:
@@ -112,6 +133,63 @@ def inspect_spreadsheet(path: str | Path, original_name: str = "") -> dict:
             for name, rows in sheets.items()
         ]
     }
+
+
+def parse_store_export(
+    input_csv: str | Path,
+    out_dir: Path,
+    additional_drop_indexes: list[int] | None = None,
+) -> Path:
+    """Remove the standard and user-selected columns without coercing cell values."""
+    input_path = Path(input_csv)
+    with open(input_path, "rb") as source:
+        prefix = source.read(4)
+        source.seek(0)
+        has_bom = prefix.startswith(b"\xef\xbb\xbf")
+        sample = source.read(8192)
+        source.seek(0)
+        text_sample = sample.decode("utf-8-sig", errors="replace")
+        try:
+            dialect = csv.Sniffer().sniff(text_sample, delimiters=",;\t")
+        except csv.Error:
+            dialect = csv.excel
+        newline = "\r\n" if b"\r\n" in sample else "\n"
+        with open(input_path, "r", encoding="utf-8-sig", newline="") as csv_source:
+            reader = csv.reader(csv_source, dialect)
+            try:
+                headers = next(reader)
+            except StopIteration as exc:
+                raise ValueError("The uploaded CSV is empty") from exc
+            if not headers:
+                raise ValueError("The uploaded CSV has no header row")
+
+            requested_indexes = additional_drop_indexes or []
+            if any(
+                isinstance(index, bool) or not isinstance(index, int) or index < 0 or index >= len(headers)
+                for index in requested_indexes
+            ):
+                raise ValueError("A selected column index is outside the CSV header range")
+
+            drop_indexes = {
+                index for index, header in enumerate(headers)
+                if header in STORE_EXPORT_DEFAULT_DROP_COLUMNS
+            }
+            drop_indexes.update(requested_indexes)
+            keep_indexes = [index for index in range(len(headers)) if index not in drop_indexes]
+            if not keep_indexes:
+                raise ValueError("At least one CSV column must remain")
+
+            output_path = out_dir / "parsed_store_export.csv"
+            output_encoding = "utf-8-sig" if has_bom else "utf-8"
+            with open(output_path, "w", encoding=output_encoding, newline="") as csv_target:
+                writer = csv.writer(csv_target, dialect, lineterminator=newline)
+                writer.writerow([headers[index] for index in keep_indexes])
+                for row in reader:
+                    writer.writerow([
+                        row[index] if index < len(row) else ""
+                        for index in keep_indexes
+                    ])
+    return output_path
 
 
 def read_pdf_text_pages(path: str | Path) -> list[str]:
@@ -902,6 +980,8 @@ def process_batch(
     spreadsheet_path: str | Path | None = None,
     spreadsheet_name: str = "",
     spreadsheet_mapping: dict | None = None,
+    store_export_path: str | Path | None = None,
+    remove_column_indexes: list[int] | None = None,
 ) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -985,6 +1065,15 @@ def process_batch(
                 spreadsheet_mapping,
                 out_dir,
             )
+        )
+
+    if preset == "parse_store_export":
+        if not store_export_path:
+            raise ValueError("A store export CSV is required")
+        outputs["parsed_store_export"] = parse_store_export(
+            store_export_path,
+            out_dir,
+            remove_column_indexes,
         )
 
     sorted_slips: list[SlipPage] | None = None
