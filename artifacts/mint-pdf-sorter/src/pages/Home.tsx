@@ -146,7 +146,16 @@ export default function Home() {
     <div className="min-h-screen bg-background py-10 px-4 md:px-8 flex flex-col items-center">
       <div className="w-full max-w-4xl space-y-8">
         <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Mint Sorter &amp; Parser</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            <a
+              href={import.meta.env.BASE_URL}
+              title="Home — start a new session"
+              aria-label="Mint Sorter & Parser — Home, start a new session"
+              className="rounded-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+            >
+              Mint Sorter &amp; Parser
+            </a>
+          </h1>
           <p className="text-muted-foreground">
             Sort and match PDFs, or clean common store exports.
           </p>
