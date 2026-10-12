@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ProcessInputPreset, OutputFile } from "@workspace/api-client-react";
+import { ProcessInputPreset, ProcessResult } from "@workspace/api-client-react";
 import { CustomSortBuilder } from "@/components/CustomSortBuilder";
 import { SpreadsheetMapping, type SpreadsheetColumnMapping } from "@/components/SpreadsheetMapping";
 import { StoreExportParser } from "@/components/StoreExportParser";
@@ -40,7 +40,7 @@ export default function Home() {
   const [additionalDropIndexes, setAdditionalDropIndexes] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<{ jobId: string; outputs: OutputFile[] } | null>(null);
+  const [results, setResults] = useState<ProcessResult | null>(null);
 
   const needsPackingSlips = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_slips_custom_first", "sort_labels", "sort_both", "match_labels", "custom_sort", "required_field", "split_required_field"].includes(preset);
   const needsLabels = ["combine_labels", "sort_labels", "sort_both", "match_labels", "spreadsheet_sequence"].includes(preset);
@@ -118,11 +118,13 @@ export default function Home() {
         throw new Error(err.error || "Processing failed");
       }
 
-      const result = await response.json();
+      const result: ProcessResult = await response.json();
       setResults(result);
       toast({
-        title: "Processing complete",
-        description: "Your files are ready for download.",
+        title: result.warnings.length ? "Completed with warnings" : "Processing complete",
+        description: result.warnings.length
+          ? "Some selected sort fields could not be read. Review the warnings before using your files."
+          : "Your files are ready for download.",
       });
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred during processing.");
@@ -378,10 +380,29 @@ export default function Home() {
             >
               <Card className="border-primary/20 shadow-md overflow-hidden">
                 <div className="bg-primary/10 px-6 py-4 flex items-center border-b border-primary/20">
-                  <CheckCircle2 className="h-5 w-5 text-primary mr-3" />
-                  <h3 className="font-semibold text-primary">Processing Successful</h3>
+                  {results.warnings.length
+                    ? <AlertCircle className="h-5 w-5 text-amber-600 mr-3" />
+                    : <CheckCircle2 className="h-5 w-5 text-primary mr-3" />}
+                  <h3 className="font-semibold">{results.warnings.length ? "Completed with warnings — check sort order" : "Processing Successful"}</h3>
                 </div>
                 <CardContent className="p-6">
+                  {results.warnings.length > 0 && (
+                    <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Sort order may be unreliable</AlertTitle>
+                      <AlertDescription>
+                        <p>All orders were kept. No pages were discarded because of missing sort fields. Page numbers below refer to the original uploaded PDF, not the sorted output.</p>
+                        <ul className="mt-3 space-y-3 max-h-72 overflow-y-auto">
+                          {results.warnings.map((warning, index) => (
+                            <li key={index}>
+                              <strong>Source page(s) {warning.sourcePages.join(", ")}{warning.orderNumber ? ` · Order #${warning.orderNumber}` : " · Order number unreadable"}</strong>
+                              <p>{warning.message}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="grid gap-4 sm:grid-cols-2">
                     {results.outputs.map((output) => {
                       const downloadUrl = `${import.meta.env.BASE_URL}api/jobs/${results.jobId}/files/${output.key}`;

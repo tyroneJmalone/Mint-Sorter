@@ -729,9 +729,10 @@ def group_slip_pages(slips: list[SlipPage]) -> list[list[SlipPage]]:
     return groups
 
 
-def sort_packing_slips(input_pdf: str | Path, output_pdf: str | Path, single_line_item_first=False) -> list[SlipPage]:
-    slips = parse_packing_slips(input_pdf)
-    groups = group_slip_pages(slips)
+def sort_packing_slips(input_pdf: str | Path, output_pdf: str | Path, single_line_item_first=False,
+                       groups: list[list[SlipPage]] | None = None) -> list[SlipPage]:
+    if groups is None:
+        groups = group_slip_pages(parse_packing_slips(input_pdf))
     sorted_groups = sorted(groups, key=lambda g: g[0].sort_key)
     sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
     all_pages = [s.page_index for g in sorted_groups for s in g]
@@ -1055,6 +1056,85 @@ def sort_to_spreadsheet_sequence(
     return outputs
 
 
+def missing_sort_field_warnings(
+    groups: list[list[SlipPage]], preset: str, sort_fields: list[str] | None = None,
+) -> list[dict]:
+    """Check the same first-page keys used for sorting, not continuation pages."""
+    product_fields = ["style", "color", "size"]
+    fields = {
+        "sort_slips": [*product_fields, "order_number"],
+        "sort_labels": [*product_fields, "order_number"],
+        "sort_both": [*product_fields, "order_number"],
+        "sort_slips_name": [*product_fields, "last_name"],
+        "sort_slips_custom": [*product_fields, "last_name", "custom_field"],
+        "sort_slips_custom_first": ["custom_field", "last_name"],
+        "required_field": ["required_field"],
+        "custom_sort": sort_fields or ["last_name"],
+    }.get(preset, [])
+    labels = {"style": "style", "color": "color", "size": "size",
+              "first_name": "recipient first name", "last_name": "recipient last name",
+              "order_number": "order number", "custom_field": "custom field",
+              "required_field": "recognizable birth year", "location": "location",
+              "delivery_method": "delivery method", "sort_number": "sort number",
+              "order_date": "order date"}
+    warnings = []
+    for group in groups:
+        slip = group[0]
+        missing = []
+        for field in dict.fromkeys(fields):
+            if field not in labels:
+                continue
+            if field == "required_field":
+                value = _extract_birth_year(slip.required_field_value)
+            elif field in {"first_name", "last_name"}:
+                value = slip.sort_value_for_field(field)
+            else:
+                value = getattr(slip, "custom_field_value" if field == "custom_field" else field, "")
+            # Unstructured header/store text is not a reliable recipient name.
+            if not norm_text(value) or (
+                field in {"first_name", "last_name"} and "," not in slip.shipping_name
+            ):
+                missing.append(labels[field])
+        if missing:
+            pages = [page.page_index + 1 for page in group]
+            warnings.append({
+                "sourcePages": pages,
+                "orderNumber": slip.order_number,
+                "missingFields": missing,
+                "message": (
+                    f"Could not reliably read {', '.join(missing)} on source page "
+                    f"{pages[0]}. This order was kept, but its sort position may be incorrect. "
+                    "Check these fields in the original packing-slip PDF and verify the output "
+                    "before printing, or choose a sort that does not use them."
+                ),
+            })
+        # Grouping itself depends on order numbers. A missing number may hide
+        # a separate order inside an otherwise complete group.
+        if fields:
+            for page in group[1:]:
+                if page.order_number:
+                    continue
+                page_marker = re.search(r"Page\s+(\d+)\s+of\s+\d+", page.raw_text, re.I)
+                known_continuation = page_marker and int(page_marker.group(1)) > 1
+                totals_only = (
+                    re.search(r"\btotal\b", page.raw_text, re.I)
+                    and not any((page.style, page.color, page.size))
+                )
+                if known_continuation or totals_only:
+                    continue
+                warnings.append({
+                    "sourcePages": [page.page_index + 1],
+                    "orderNumber": "",
+                    "missingFields": ["order number"],
+                    "message": (
+                        f"Could not read an order number on source page {page.page_index + 1}. "
+                        "This page was kept with the preceding order, but may be a separate order. "
+                        "Check the original PDF and verify both grouping and sort position before printing."
+                    ),
+                })
+    return warnings
+
+
 def process_batch(
     packing_slips_pdf: str | Path,
     label_pdfs: list[str | Path],
@@ -1067,12 +1147,23 @@ def process_batch(
     store_export_path: str | Path | None = None,
     remove_column_indexes: list[int] | None = None,
     single_line_item_first: bool = False,
+    warnings: list[dict] | None = None,
 ) -> dict[str, Path]:
     if single_line_item_first and preset in {"combine_labels", "match_labels", "parse_store_export"}:
         raise ValueError("Single-line-item priority is not available for this preset")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, Path] = {}
+    sorting_presets = {
+        "sort_slips", "sort_labels", "sort_both", "sort_slips_name",
+        "sort_slips_custom", "sort_slips_custom_first", "custom_sort", "required_field",
+    }
+    groups = []
+    if preset in sorting_presets:
+        groups = group_slip_pages(parse_packing_slips(packing_slips_pdf))
+        detected = missing_sort_field_warnings(groups, preset, sort_fields)
+        if warnings is not None:
+            warnings.extend(detected)
 
     if preset in {"combine_labels", "sort_labels", "sort_both"}:
         combined = out_dir / "combined_labels.pdf"
@@ -1080,8 +1171,6 @@ def process_batch(
         outputs["combined_labels"] = combined
 
     if preset == "sort_slips_name":
-        slips = parse_packing_slips(packing_slips_pdf)
-        groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_name)
         sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
@@ -1093,8 +1182,6 @@ def process_batch(
         outputs["custom_sort_report"] = report_csv
 
     if preset == "sort_slips_custom":
-        slips = parse_packing_slips(packing_slips_pdf)
-        groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom)
         sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
@@ -1106,8 +1193,6 @@ def process_batch(
         outputs["custom_field_report"] = report_csv
 
     if preset == "sort_slips_custom_first":
-        slips = parse_packing_slips(packing_slips_pdf)
-        groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom_first)
         sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
@@ -1120,8 +1205,6 @@ def process_batch(
 
     if preset == "custom_sort":
         fields = sort_fields or ["last_name"]
-        slips = parse_packing_slips(packing_slips_pdf)
-        groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].build_sort_key(fields))
         sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
@@ -1133,8 +1216,6 @@ def process_batch(
         outputs["custom_sort_report"] = report_csv
 
     if preset == "required_field":
-        slips = parse_packing_slips(packing_slips_pdf)
-        groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_required_field)
         sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
@@ -1175,7 +1256,7 @@ def process_batch(
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
-        sorted_slips = sort_packing_slips(packing_slips_pdf, sorted_slips_pdf, single_line_item_first)
+        sorted_slips = sort_packing_slips(packing_slips_pdf, sorted_slips_pdf, single_line_item_first, groups=groups)
         outputs["sorted_packing_slips"] = sorted_slips_pdf
 
     if preset in {"sort_labels", "sort_both"}:

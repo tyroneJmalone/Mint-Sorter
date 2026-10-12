@@ -31,6 +31,7 @@ export const ProcessFilesBody = zod.object({
   "remove_column_indexes": zod.string().optional().describe('JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset')
 })
 
+
 export const ProcessFilesResponse = zod.object({
   "jobId": zod.string(),
   "outputs": zod.array(zod.object({
@@ -38,6 +39,12 @@ export const ProcessFilesResponse = zod.object({
   "filename": zod.string(),
   "label": zod.string(),
   "mime": zod.string()
+})),
+  "warnings": zod.array(zod.object({
+  "sourcePages": zod.array(zod.number().min(1)),
+  "orderNumber": zod.string(),
+  "missingFields": zod.array(zod.string()),
+  "message": zod.string()
 }))
 })
 
@@ -64,5 +71,4 @@ export const DownloadFileParams = zod.object({
   "jobId": zod.coerce.string(),
   "key": zod.coerce.string()
 })
-
 

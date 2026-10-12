@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OutputFile } from './outputFile';
+import type { SortWarning } from './sortWarning';
 
 export interface ProcessResult {
   jobId: string;
   outputs: OutputFile[];
+  warnings: SortWarning[];
 }

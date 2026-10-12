@@ -37,6 +37,7 @@ if __name__ == "__main__":
     packing = Path(args.packing_path) if args.packing_path else Path("")
     label_paths = [Path(p) for p in args.labels]
 
+    warnings: list[dict] = []
     process_batch(packing, label_paths, Path(args.out_dir), args.preset,
                   sort_fields=sort_fields if sort_fields else None,
                   single_line_item_first=args.single_line_item_first,
@@ -44,4 +45,5 @@ if __name__ == "__main__":
                   spreadsheet_name=args.spreadsheet_name,
                   spreadsheet_mapping=spreadsheet_mapping if spreadsheet_mapping else None,
                   store_export_path=Path(args.store_export_path) if args.store_export_path else None,
-                  remove_column_indexes=remove_column_indexes)
+                  remove_column_indexes=remove_column_indexes, warnings=warnings)
+    print(json.dumps({"warnings": warnings}))

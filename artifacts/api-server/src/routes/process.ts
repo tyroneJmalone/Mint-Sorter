@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { logger } from "../lib/logger";
+import { ProcessFilesResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -256,15 +257,23 @@ router.post(
     ];
 
     req.log.info({ preset, labelCount: labelPaths.length }, "Starting PDF processing");
-
+    let processingMetadata: { warnings: unknown[] };
     try {
       await new Promise<void>((resolve, reject) => {
         const proc = spawn("python3", args);
         let stderr = "";
+        let stdout = "";
+        proc.stdout.on("data", (d) => { stdout += d.toString(); });
         proc.stderr.on("data", (d) => { stderr += d.toString(); });
         proc.on("close", (code) => {
           if (code === 0) {
-            resolve();
+            try {
+              processingMetadata = JSON.parse(stdout);
+              ProcessFilesResponse.parse({ jobId, outputs: [], warnings: processingMetadata.warnings });
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
           } else {
             reject(new Error(`Python exited with code ${code}: ${stderr}`));
           }
@@ -277,7 +286,6 @@ router.post(
       return;
     }
 
-    // Read output files from outDir
     const outputFiles = fs.readdirSync(outDir);
     const jobFiles = new Map<string, { filepath: string; filename: string; mime: string; label: string }>();
 
@@ -323,7 +331,7 @@ router.post(
     );
 
     req.log.info({ jobId, outputCount: outputs.length }, "Processing complete");
-    res.json({ jobId, outputs });
+    res.json({ jobId, outputs, warnings: processingMetadata!.warnings });
   }
 );
 

@@ -65,12 +65,18 @@ export interface OutputFile {
   mime: string;
 }
 
+export interface SortWarning {
+  sourcePages: number[];
+  orderNumber: string;
+  missingFields: string[];
+  message: string;
+}
 export interface ProcessResult {
   jobId: string;
   outputs: OutputFile[];
+  warnings: SortWarning[];
 }
 
 export interface ApiError {
   error: string;
 }
-
