@@ -28,6 +28,7 @@ function mimeForExt(ext: string): string {
 }
 
 const OUTPUT_LABELS: Record<string, string> = {
+  packing_slip_consolidation_report: "Download packing-slip consolidation report CSV",
   combined_labels: "Download combined labels PDF",
   sorted_packing_slips: "Download sorted packing slips PDF",
   sorted_shipping_labels: "Download sorted shipping labels PDF",

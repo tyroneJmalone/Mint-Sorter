@@ -1181,6 +1181,34 @@ def process_batch(
         report.to_csv(report_csv, index=False)
         outputs["match_report"] = report_csv
 
+    # Consolidation is a final formatting step, after sequencing and matching.
+    # It never changes order grouping, label order, or the uploaded source PDF.
+    from slip_consolidation import consolidate_packing_slips
+    consolidation_rows = []
+    for key, output_path in outputs.items():
+        if output_path.suffix.lower() == ".pdf" and (
+            key in ("sorted_packing_slips", "spreadsheet_sequence_packing_slips")
+            or key.startswith("birth_year_")
+        ):
+            consolidation_rows.extend(consolidate_packing_slips(output_path))
+    if consolidation_rows:
+        consolidation_report = out_dir / "packing_slip_consolidation_report.csv"
+        pd.DataFrame(consolidation_rows).to_csv(consolidation_report, index=False)
+        outputs["packing_slip_consolidation_report"] = consolidation_report
+        if "birth_year_batch_manifest" in outputs:
+            manifest_path = outputs["birth_year_batch_manifest"]
+            with manifest_path.open(newline="") as source:
+                manifest_rows = list(csv.DictReader(source))
+            output_counts = {}
+            for row in consolidation_rows:
+                key = (row["pdf"], row["order_number"])
+                output_counts[key] = output_counts.get(key, 0) + row["output_pages"]
+            for row in manifest_rows:
+                row["output_page_count"] = output_counts.get(
+                    (f"packing_slips_birth_year_{row['batch']}.pdf", row["order_number"]), ""
+                )
+            pd.DataFrame(manifest_rows).to_csv(manifest_path, index=False)
+
     zip_path = out_dir / "mint_sorter_parser_outputs.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for name, path in outputs.items():

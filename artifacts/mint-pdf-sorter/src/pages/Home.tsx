@@ -222,7 +222,13 @@ export default function Home() {
                   <Label>Packing Slips (Single PDF)</Label>
                   {preset === "split_required_field" && (
                     <p className="text-sm text-muted-foreground">
-                      Creates one PDF per birth year without changing the order sequence or page formatting.
+                      Creates one PDF per birth year without changing the order sequence.
+                    </p>
+                  )}
+                  {preset !== "match_labels" && (
+                    <p className="text-sm text-muted-foreground">
+                      Totals-only continuation pages are automatically consolidated when the summary fits.
+                      Product pages stay intact. A downloadable report explains which slips were consolidated or kept.
                     </p>
                   )}
                   <FileDropzone

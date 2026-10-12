@@ -2,3 +2,4 @@
 - [Spreadsheet sequencing](spreadsheet-sequencing.md) — spreadsheet order number alone drives slip order; labels then follow the reordered slips.
 - [Store export parsing](store-export-parsing.md) — remove the fixed Chipply columns plus job-specific selections while preserving retained CSV values as text.
 - [Packing-slip layout variation](packing-slip-layouts.md) — store titles, optional table columns, and wrapped cells make flattened-text sort extraction unsafe.
+- [Python installation limitation](python-installation.md) — managed Python installs can target the read-only Nix interpreter instead of workspace packages.

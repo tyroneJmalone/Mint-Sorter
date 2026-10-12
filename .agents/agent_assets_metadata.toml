@@ -98,3 +98,31 @@ mtime_ms = 1791825534208
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/fe403f51-9206-4c87-94c8-d98933dbbb78/db5ae40b-e088-4c8f-beea-3d0df53a2b35"
 storage_version_token = "1791825578111207"
 content_type = "text/csv"
+
+[[outputs]]
+id = "ubu_K7HR5163YXic0accq"
+uri = "file://generated-artifacts/consolidation-check/sorted_packing_slips.pdf"
+type = "pdf"
+title = "Sorted and consolidated packing slips"
+description = "Verified sample: 278 pages reduced to 169, with all 140 orders and product text retained."
+logical_id = "efa3f977-a494-4f7c-9f92-eb8c6cd1c9d0"
+content_hash = "sha256:0cf06f5fb14b8503a4c3d7466fbeb31257fc146e0129655665af9487e8412427"
+size = 4043340
+mtime_ms = 1791826665432
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/efa3f977-a494-4f7c-9f92-eb8c6cd1c9d0/7c7fbfe6-f833-41cb-b7fe-7b7bdaf5ca16"
+storage_version_token = "1791826750246046"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "IPp2lSChwKwCeFsISAGBk"
+uri = "file://generated-artifacts/consolidation-check/packing_slip_consolidation_report.csv"
+type = "table"
+title = "Packing-slip consolidation report"
+description = "Per-order page counts and reasons each slip was consolidated or preserved."
+logical_id = "80588414-f691-4540-9d35-3f5116edcd6f"
+content_hash = "sha256:d0d87b52d00e045ee45f66e28afefc006528b39db6d4c632f16910570870f516"
+size = 11825
+mtime_ms = 1791826665440
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/80588414-f691-4540-9d35-3f5116edcd6f/f2ab5ad5-cd00-46fd-918c-b9e48bb59468"
+storage_version_token = "1791826750922736"
+content_type = "text/csv"
