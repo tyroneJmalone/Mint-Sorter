@@ -390,10 +390,7 @@ class SlipPage:
 
     @property
     def sort_key_name(self):
-        # shipping_name is "Last, First" — sort by last name token
-        last = self.shipping_name.split(",")[0].strip().upper() if self.shipping_name else ""
-        size_rank = SIZE_ORDER.get(self.size.upper(), 99)
-        return (self.style, self.color, size_rank, last, self.page_index)
+        return self.build_sort_key(["style", "color", "size", "last_name"])
 
     @property
     def sort_key_custom(self):
@@ -543,13 +540,88 @@ def parse_slip_text(text: str, page_index: int, required_field_value: str = "") 
                     required_field_value=required_field_value)
 
 
+def apply_positioned_slip_fields(page, slip: SlipPage) -> None:
+    """Read column cells rather than guessing from interleaved PDF text lines."""
+    words = page.extract_words(x_tolerance=1, y_tolerance=3)
+    style_header = next((w for w in words if w["text"] == "Style"), None)
+    if style_header:
+        headers = {
+            w["text"]: w for w in words
+            if abs(w["top"] - style_header["top"]) < 3
+        }
+        if all(key in headers for key in ("Product", "Size", "Color", "Qty")):
+            style_right = headers.get("Vendor", headers["Product"])["x0"]
+            # The first item supplies the order's product sort key. Keep the
+            # complete order intact, including all subsequent product pages.
+            candidates = [
+                w for w in words
+                if style_header["x0"] - 2 <= w["x0"] < style_right - 2
+                and w["top"] > style_header["bottom"] + 2
+                and w["top"] < page.height - 50
+            ]
+            if candidates:
+                anchor = min(candidates, key=lambda w: (w["top"], w["x0"]))
+                # Chipply draws cell rectangles around each product row.
+                cells = [
+                    r for r in page.rects
+                    if r["x0"] <= anchor["x0"] < r["x1"]
+                    and r["top"] <= anchor["top"] and r["bottom"] >= anchor["bottom"]
+                    and r["height"] > 10 and r["width"] > 10
+                ]
+                if cells:
+                    cell = min(cells, key=lambda r: r["height"])
+                    top, bottom = cell["top"], cell["bottom"]
+                else:
+                    top, bottom = anchor["top"] - 2, anchor["bottom"] + 2
+
+                def cell_text(left, right):
+                    selected = [
+                        w for w in words
+                        if left - 2 <= w["x0"] < right - 2
+                        and top <= (w["top"] + w["bottom"]) / 2 < bottom
+                    ]
+                    return " ".join(w["text"] for w in sorted(
+                        selected, key=lambda w: (round(w["top"], 1), w["x0"])
+                    )).strip()
+
+                slip.style = cell_text(style_header["x0"], style_right)
+                slip.size = cell_text(headers["Size"]["x0"], headers["Color"]["x0"])
+                slip.color = cell_text(headers["Color"]["x0"], headers["Qty"]["x0"])
+                # Export colors may append the style code; it is not a color.
+                slip.color = re.sub(
+                    r"\s+-\s*" + re.escape(slip.style) + r"$", "", slip.color
+                ).strip()
+
+    # Recipient fields are more reliable than a store-title/first-line fallback.
+    recipient = {}
+    for word in words:
+        if word["text"] != "Recipient":
+            continue
+        line = sorted(
+            [w for w in words if abs(w["top"] - word["top"]) < 2 and w["x0"] >= word["x0"]],
+            key=lambda w: w["x0"],
+        )
+        kind = next((w for w in line if w["text"] in ("First", "Last")), None)
+        if kind:
+            value = " ".join(
+                w["text"] for w in line
+                if w["x0"] > kind["x1"] + 2 and w["text"] not in ("Name:", "Name")
+            )
+            if value:
+                recipient[kind["text"]] = value
+    if recipient.get("First") and recipient.get("Last"):
+        slip.shipping_name = f"{recipient['Last']}, {recipient['First']}"
+
+
 def parse_packing_slips(path: str | Path) -> list[SlipPage]:
     slips: list[SlipPage] = []
     with pdfplumber.open(str(path)) as pdf:
         for i, page in enumerate(pdf.pages):
             text = page.extract_text(x_tolerance=1, y_tolerance=3) or ""
             required_field_value = extract_required_field_from_page(page)
-            slips.append(parse_slip_text(text, i, required_field_value))
+            slip = parse_slip_text(text, i, required_field_value)
+            apply_positioned_slip_fields(page, slip)
+            slips.append(slip)
     return slips
 
 
@@ -762,6 +834,7 @@ def _write_custom_sort_report(sorted_groups: list[list[SlipPage]], report_csv: P
         rows.append({
             "sequence": seq,
             "order_number": s.order_number,
+            "source_pages": ", ".join(str(page.page_index + 1) for page in group),
             "last_name": last,
             "first_name": first,
             "style": s.style,
@@ -1000,6 +1073,9 @@ def process_batch(
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
         outputs["sorted_packing_slips"] = sorted_slips_pdf
+        report_csv = out_dir / "custom_sort_report.csv"
+        _write_custom_sort_report(sorted_groups, report_csv)
+        outputs["custom_sort_report"] = report_csv
 
     if preset == "sort_slips_custom":
         slips = parse_packing_slips(packing_slips_pdf)

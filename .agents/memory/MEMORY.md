@@ -1,3 +1,4 @@
 - [Packing-slip page consolidation](packing-slip-page-consolidation.md) — collapse totals-only continuation pages, but preserve pages containing product rows.
 - [Spreadsheet sequencing](spreadsheet-sequencing.md) — spreadsheet order number alone drives slip order; labels then follow the reordered slips.
 - [Store export parsing](store-export-parsing.md) — remove the fixed Chipply columns plus job-specific selections while preserving retained CSV values as text.
+- [Packing-slip layout variation](packing-slip-layouts.md) — store titles, optional table columns, and wrapped cells make flattened-text sort extraction unsafe.

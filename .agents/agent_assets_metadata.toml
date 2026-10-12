@@ -70,3 +70,31 @@ mtime_ms = 1788534347098
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/88b9f7fd-fb39-4cd0-96e2-aa0c939fcc1a/26ae72cd-91fd-4c30-9188-2676bd78d9ee"
 storage_version_token = "1788534453847159"
 content_type = "text/csv"
+
+[[outputs]]
+id = "vRkmgS864pfuUxOUNDRWl"
+uri = "file://generated-artifacts/slip-sort-fixed/sorted_packing_slips.pdf"
+type = "pdf"
+title = "Corrected packing slips — Style → Color → Size → Last Name"
+description = "All 180 original pages, reordered using the corrected field extraction."
+logical_id = "b802aed8-97cf-4829-903b-3b7a09a714f6"
+content_hash = "sha256:2924d976d55446ad348476d1193d2b0991045f3cadc0e52f2c99773a95659b6b"
+size = 1806037
+mtime_ms = 1791825534200
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/b802aed8-97cf-4829-903b-3b7a09a714f6/1f16651c-1937-4a3d-a3c4-5579ce85262d"
+storage_version_token = "1791825577429040"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "cRzffPzc8cBJmYOv7UU-s"
+uri = "file://generated-artifacts/slip-sort-fixed/custom_sort_report.csv"
+type = "table"
+title = "Packing-slip sort audit report"
+description = "Output sequence, original page, order number, recipient, style, color, and size for every slip."
+logical_id = "fe403f51-9206-4c87-94c8-d98933dbbb78"
+content_hash = "sha256:1f8a6a3b6a787da34bd41a112d75e2b74faa614769778d10ef95175a858414c8"
+size = 19101
+mtime_ms = 1791825534208
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/fe403f51-9206-4c87-94c8-d98933dbbb78/db5ae40b-e088-4c8f-beea-3d0df53a2b35"
+storage_version_token = "1791825578111207"
+content_type = "text/csv"
