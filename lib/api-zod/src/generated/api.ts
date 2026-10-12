@@ -21,9 +21,12 @@ export const HealthCheckResponse = zod.object({
  * Upload files (multipart/form-data) with a preset; returns a job ID and output file list
  * @summary Sort PDF files or parse store export CSV files
  */
+export const processFilesBodySingleLineItemFirstDefault = false;
+
 export const ProcessFilesBody = zod.object({
   "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort', 'required_field', 'split_required_field', 'spreadsheet_sequence', 'parse_store_export']).describe('Processing preset'),
   "sort_fields": zod.string().optional().describe('JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date'),
+  "single_line_item_first": zod.boolean().default(processFilesBodySingleLineItemFirstDefault).describe('Put single-product-line orders before multi-line orders while retaining the selected sequence within each group. Applies within each birth-year batch. Not supported for combine_labels, match_labels, or parse_store_export.'),
   "spreadsheet_mapping": zod.string().optional().describe('JSON column mapping used by the spreadsheet_sequence preset'),
   "remove_column_indexes": zod.string().optional().describe('JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset')
 })

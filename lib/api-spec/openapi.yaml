@@ -137,6 +137,10 @@ components:
         sort_fields:
           type: string
           description: "JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date"
+        single_line_item_first:
+          type: boolean
+          default: false
+          description: Put single-product-line orders before multi-line orders while retaining the selected sequence within each group. Applies within each birth-year batch. Not supported for combine_labels, match_labels, or parse_store_export.
         spreadsheet_mapping:
           type: string
           description: JSON column mapping used by the spreadsheet_sequence preset

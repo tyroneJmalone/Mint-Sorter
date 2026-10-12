@@ -12,6 +12,8 @@ export interface ProcessInput {
   preset: ProcessInputPreset;
   /** JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date */
   sort_fields?: string;
+  /** Put single-product-line orders before multi-line orders while retaining the selected sequence within each group. Applies within each birth-year batch. Not supported for combine_labels, match_labels, or parse_store_export. */
+  single_line_item_first?: boolean;
   /** JSON column mapping used by the spreadsheet_sequence preset */
   spreadsheet_mapping?: string;
   /** JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset */

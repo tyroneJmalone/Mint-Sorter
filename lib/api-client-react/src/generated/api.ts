@@ -136,6 +136,9 @@ formData.append(`preset`, processInput.preset);
 if(processInput.sort_fields !== undefined) {
  formData.append(`sort_fields`, processInput.sort_fields);
  }
+if(processInput.single_line_item_first !== undefined) {
+ formData.append(`single_line_item_first`, processInput.single_line_item_first.toString())
+ }
 if(processInput.spreadsheet_mapping !== undefined) {
  formData.append(`spreadsheet_mapping`, processInput.spreadsheet_mapping);
  }

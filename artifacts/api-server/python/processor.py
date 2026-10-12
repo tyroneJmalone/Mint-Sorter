@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 import pandas as pd
 import pdfplumber
 from pypdf import PdfReader, PdfWriter
+from line_items import count_product_rows, prioritize_single_line_items
 
 
 SHEET_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -382,6 +383,7 @@ class SlipPage:
     sort_number: str = ""
     order_date: str = ""
     required_field_value: str = ""
+    line_item_count: int | None = None
 
     @property
     def sort_key(self):
@@ -543,6 +545,7 @@ def parse_slip_text(text: str, page_index: int, required_field_value: str = "") 
 def apply_positioned_slip_fields(page, slip: SlipPage) -> None:
     """Read column cells rather than guessing from interleaved PDF text lines."""
     words = page.extract_words(x_tolerance=1, y_tolerance=3)
+    slip.line_item_count = count_product_rows(page, words)
     style_header = next((w for w in words if w["text"] == "Style"), None)
     if style_header:
         headers = {
@@ -726,10 +729,11 @@ def group_slip_pages(slips: list[SlipPage]) -> list[list[SlipPage]]:
     return groups
 
 
-def sort_packing_slips(input_pdf: str | Path, output_pdf: str | Path) -> list[SlipPage]:
+def sort_packing_slips(input_pdf: str | Path, output_pdf: str | Path, single_line_item_first=False) -> list[SlipPage]:
     slips = parse_packing_slips(input_pdf)
     groups = group_slip_pages(slips)
     sorted_groups = sorted(groups, key=lambda g: g[0].sort_key)
+    sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
     all_pages = [s.page_index for g in sorted_groups for s in g]
     write_selected_pages(input_pdf, output_pdf, all_pages)
     return [g[0] for g in sorted_groups]
@@ -872,6 +876,7 @@ def _write_custom_field_report(sorted_groups: list[list[SlipPage]], report_csv: 
 def split_packing_slips_by_required_field(
     input_pdf: str | Path,
     out_dir: Path,
+    single_line_item_first=False,
 ) -> dict[str, Path]:
     """
     Split a packing-slip PDF into one PDF per birth year without re-sorting it.
@@ -901,7 +906,7 @@ def split_packing_slips_by_required_field(
 
     outputs: dict[str, Path] = {}
     for batch_value in sorted(batches, key=lambda value: (value == "unknown", value)):
-        batch_groups = batches[batch_value]
+        batch_groups = prioritize_single_line_items(batches[batch_value], single_line_item_first)
         filename = f"packing_slips_birth_year_{batch_value}.pdf"
         output_pdf = out_dir / filename
         page_indices = [page.page_index for group in batch_groups for page in group]
@@ -921,6 +926,7 @@ def sort_to_spreadsheet_sequence(
     spreadsheet_name: str,
     mapping: dict,
     out_dir: Path,
+    single_line_item_first=False,
 ) -> dict[str, Path]:
     sheets = read_spreadsheet_sheets(spreadsheet_path, spreadsheet_name)
     sheet_name = str(mapping.get("sheet_name") or next(iter(sheets), ""))
@@ -1021,6 +1027,11 @@ def sort_to_spreadsheet_sequence(
         })
 
     ordered_groups = [groups[index] for index in ordered_group_indices]
+    ordered_groups = prioritize_single_line_items(ordered_groups, single_line_item_first)
+    final_sequences = {g[0].order_number: n for n, g in enumerate(ordered_groups, 1)}
+    for row in report_rows:
+        if row["output_sequence"] != "":
+            row["output_sequence"] = final_sequences[row["slip_order_number"]]
     sorted_slips_pdf = out_dir / "spreadsheet_sequence_packing_slips.pdf"
     write_selected_pages(
         packing_slips_pdf,
@@ -1055,7 +1066,10 @@ def process_batch(
     spreadsheet_mapping: dict | None = None,
     store_export_path: str | Path | None = None,
     remove_column_indexes: list[int] | None = None,
+    single_line_item_first: bool = False,
 ) -> dict[str, Path]:
+    if single_line_item_first and preset in {"combine_labels", "match_labels", "parse_store_export"}:
+        raise ValueError("Single-line-item priority is not available for this preset")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, Path] = {}
@@ -1069,6 +1083,7 @@ def process_batch(
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_name)
+        sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
@@ -1081,6 +1096,7 @@ def process_batch(
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom)
+        sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
@@ -1093,6 +1109,7 @@ def process_batch(
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_custom_first)
+        sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
@@ -1106,6 +1123,7 @@ def process_batch(
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].build_sort_key(fields))
+        sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
@@ -1118,6 +1136,7 @@ def process_batch(
         slips = parse_packing_slips(packing_slips_pdf)
         groups = group_slip_pages(slips)
         sorted_groups = sorted(groups, key=lambda g: g[0].sort_key_required_field)
+        sorted_groups = prioritize_single_line_items(sorted_groups, single_line_item_first)
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
         write_selected_pages(packing_slips_pdf, sorted_slips_pdf,
                              [s.page_index for g in sorted_groups for s in g])
@@ -1127,7 +1146,7 @@ def process_batch(
         outputs["required_field_report"] = report_csv
 
     if preset == "split_required_field":
-        outputs.update(split_packing_slips_by_required_field(packing_slips_pdf, out_dir))
+        outputs.update(split_packing_slips_by_required_field(packing_slips_pdf, out_dir, single_line_item_first))
 
     if preset == "spreadsheet_sequence":
         if not spreadsheet_path or not spreadsheet_mapping:
@@ -1140,6 +1159,7 @@ def process_batch(
                 spreadsheet_name,
                 spreadsheet_mapping,
                 out_dir,
+                single_line_item_first,
             )
         )
 
@@ -1155,7 +1175,7 @@ def process_batch(
     sorted_slips: list[SlipPage] | None = None
     if preset in {"sort_slips", "sort_labels", "sort_both"}:
         sorted_slips_pdf = out_dir / "sorted_packing_slips.pdf"
-        sorted_slips = sort_packing_slips(packing_slips_pdf, sorted_slips_pdf)
+        sorted_slips = sort_packing_slips(packing_slips_pdf, sorted_slips_pdf, single_line_item_first)
         outputs["sorted_packing_slips"] = sorted_slips_pdf
 
     if preset in {"sort_labels", "sort_both"}:

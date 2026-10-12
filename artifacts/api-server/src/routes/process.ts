@@ -123,6 +123,16 @@ router.post(
     }
 
     const sortFieldsRaw = req.body?.sort_fields as string | undefined;
+    const priorityRaw = req.body?.single_line_item_first;
+    if (priorityRaw !== undefined && priorityRaw !== "true" && priorityRaw !== "false") {
+      res.status(400).json({ error: "single_line_item_first must be true or false" });
+      return;
+    }
+    const singleLineItemFirst = priorityRaw === "true";
+    if (singleLineItemFirst && ["combine_labels", "match_labels", "parse_store_export"].includes(preset)) {
+      res.status(400).json({ error: "Single-line-item priority is not available for this preset" });
+      return;
+    }
     let sortFields: string[] = [];
     if (sortFieldsRaw) {
       try {
@@ -222,6 +232,7 @@ router.post(
       preset,
       packingPath,
       outDir,
+      ...(singleLineItemFirst ? ["--single-line-item-first"] : []),
       ...(sortFields.length > 0 ? ["--sort-fields", JSON.stringify(sortFields)] : []),
       ...(spreadsheetFile
         ? [

@@ -31,6 +31,7 @@ export default function Home() {
   const { toast } = useToast();
   const [preset, setPreset] = useState<ProcessInputPreset>("combine_labels");
   const [sortFields, setSortFields] = useState<string[]>([]);
+  const [singleLineItemFirst, setSingleLineItemFirst] = useState(false);
   const [packingSlips, setPackingSlips] = useState<File[]>([]);
   const [labels, setLabels] = useState<File[]>([]);
   const [spreadsheet, setSpreadsheet] = useState<File[]>([]);
@@ -46,6 +47,7 @@ export default function Home() {
   const needsSpreadsheet = preset === "spreadsheet_sequence";
   const needsStoreExport = preset === "parse_store_export";
   const needsPackingSlipsForPreset = needsPackingSlips || needsSpreadsheet;
+  const supportsSingleLineItemFirst = needsPackingSlipsForPreset && preset !== "match_labels";
 
   const handleProcess = async () => {
     if (needsPackingSlipsForPreset && packingSlips.length === 0) {
@@ -82,6 +84,9 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("preset", preset);
+      if (supportsSingleLineItemFirst) {
+        formData.append("single_line_item_first", String(singleLineItemFirst));
+      }
 
       if (preset === "custom_sort") {
         formData.append("sort_fields", JSON.stringify(sortFields));
@@ -132,6 +137,7 @@ export default function Home() {
   };
 
   const handleReset = () => {
+    setSingleLineItemFirst(false);
     setPackingSlips([]);
     setLabels([]);
     setSpreadsheet([]);
@@ -211,6 +217,27 @@ export default function Home() {
                 </motion.div>
               )}
 
+              {supportsSingleLineItemFirst && (
+                <div className="rounded-lg border p-4 space-y-2">
+                  <label className="flex items-center gap-3 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={singleLineItemFirst}
+                      onChange={(event) => setSingleLineItemFirst(event.target.checked)}
+                      disabled={isProcessing}
+                      aria-describedby="single-line-item-help"
+                    />
+                    Single-line-item orders first
+                  </label>
+                  <p id="single-line-item-help" className="text-sm text-muted-foreground">
+                    Counts product rows across the whole order, not quantities or pages.
+                    Single-line orders come first; both groups keep your selected sort.
+                    {preset === "spreadsheet_sequence" && " Spreadsheet sequence is preserved within each group."}
+                    {preset === "split_required_field" && " Applied separately inside each birth-year batch."}
+                  </p>
+                </div>
+              )}
               {needsPackingSlipsForPreset && (
                 <motion.div
                   key="packing-slips"
@@ -222,7 +249,7 @@ export default function Home() {
                   <Label>Packing Slips (Single PDF)</Label>
                   {preset === "split_required_field" && (
                     <p className="text-sm text-muted-foreground">
-                      Creates one PDF per birth year without changing the order sequence.
+                      Creates one PDF per birth year, preserving source order within each priority group.
                     </p>
                   )}
                   {preset !== "match_labels" && (
