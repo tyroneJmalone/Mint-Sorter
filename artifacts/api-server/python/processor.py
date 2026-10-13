@@ -542,9 +542,53 @@ def parse_slip_text(text: str, page_index: int, required_field_value: str = "") 
                     required_field_value=required_field_value)
 
 
+def extract_positioned_delivery_method(words):
+    """Read the delivery column without adjacent dates, names, or addresses."""
+    for delivery in words:
+        if delivery["text"] != "Delivery":
+            continue
+        method = next((w for w in words if w["text"] == "Method:"
+                       and w["x0"] >= delivery["x0"] - 2
+                       and abs(w["top"] - delivery["top"]) < 15), None)
+        if not method:
+            continue
+        right = min((w["x0"] for w in words
+                     if w["x0"] > method["x1"] + 2 and w["text"].endswith(":")
+                     and abs(w["top"] - method["top"]) < 2), default=float("inf"))
+        inline = sorted([w for w in words
+                         if method["x1"] + 2 < w["x0"] < right
+                         and abs(w["top"] - method["top"]) < 2], key=lambda w: w["x0"])
+        if inline:
+            return " ".join(w["text"] for w in inline)
+        candidates = sorted([w for w in words
+                             if delivery["x0"] - 2 <= w["x0"] < right
+                             and method["bottom"] < w["top"] < method["bottom"] + 65],
+                            key=lambda w: (w["top"], w["x0"]))
+        lines = []
+        for word in candidates:
+            if not lines or abs(word["top"] - lines[-1][0]["top"]) > 2:
+                lines.append([])
+            lines[-1].append(word)
+        value = []
+        previous_bottom = method["bottom"]
+        for line in lines:
+            line.sort(key=lambda w: w["x0"])
+            if (line[0]["top"] - previous_bottom > 18
+                    or any(":" in w["text"] for w in line)
+                    or line[0]["text"] in {"Recipient", "Sort", "Style", "Product"}):
+                break
+            value.extend(w["text"] for w in line)
+            previous_bottom = max(w["bottom"] for w in line)
+        return " ".join(value)
+    return None
+
+
 def apply_positioned_slip_fields(page, slip: SlipPage) -> None:
     """Read column cells rather than guessing from interleaved PDF text lines."""
     words = page.extract_words(x_tolerance=1, y_tolerance=3)
+    delivery_method = extract_positioned_delivery_method(words)
+    if delivery_method is not None:
+        slip.delivery_method = delivery_method
     slip.line_item_count = count_product_rows(page, words)
     style_header = next((w for w in words if w["text"] == "Style"), None)
     if style_header:

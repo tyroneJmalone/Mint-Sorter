@@ -1,5 +1,5 @@
 import unittest
-from processor import SlipPage, apply_positioned_slip_fields, group_slip_pages
+from processor import SlipPage, apply_positioned_slip_fields, group_slip_pages, extract_positioned_delivery_method
 
 
 def word(text, x, y, width=25):
@@ -32,6 +32,31 @@ def slip(index=0, order="123", style="", color="", size="", name="Store Title"):
 
 
 class SlipSortTests(unittest.TestCase):
+    def test_delivery_column_does_not_include_neighboring_date_or_billing_name(self):
+        words = [
+            word("Delivery", 410, 130, 35), word("Method:", 448, 130, 35),
+            word("Order", 18, 145), word("Date:", 50, 145),
+            word("9/4/2026", 110, 145), word("BillingSurname,", 220, 145),
+            word("Organization", 410, 145, 58), word("Pickup", 472, 145),
+            word("Recipient", 410, 163), word("First", 460, 163),
+            word("Name:", 410, 175),
+        ]
+        self.assertEqual(extract_positioned_delivery_method(words), "Organization Pickup")
+        # Customer/date changes must not separate identical delivery groups.
+        words[4]["text"] = "9/21/2026"
+        words[5]["text"] = "DifferentSurname,"
+        self.assertEqual(extract_positioned_delivery_method(words), "Organization Pickup")
+
+    def test_wrapped_delivery_and_inline_delivery_values(self):
+        header = [word("Delivery", 410, 130, 35), word("Method:", 448, 130, 35)]
+        self.assertEqual(extract_positioned_delivery_method(header + [
+            word("Organization", 410, 145), word("Pickup", 410, 156),
+            word("Recipient", 410, 175)]), "Organization Pickup")
+        self.assertEqual(extract_positioned_delivery_method(header + [
+            word("Shipping", 490, 130)]), "Shipping")
+        self.assertEqual(extract_positioned_delivery_method(header + [
+            word("Recipient", 410, 145)]), "")
+
     def test_no_sort_number_column_wrapped_color_and_recipient(self):
         parsed = slip()
         apply_positioned_slip_fields(Page(), parsed)

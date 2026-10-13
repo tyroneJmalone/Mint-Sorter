@@ -126,3 +126,31 @@ mtime_ms = 1791826665440
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/80588414-f691-4540-9d35-3f5116edcd6f/f2ab5ad5-cd00-46fd-918c-b9e48bb59468"
 storage_version_token = "1791826750922736"
 content_type = "text/csv"
+
+[[outputs]]
+id = "gv659vQxr7GgPKtqPjzaU"
+uri = "file://generated-artifacts/asd-corrected/sorted_packing_slips.pdf"
+type = "pdf"
+title = "ASD — corrected delivery/style/color/size sort"
+description = "All 135 orders retained. Uses the current first-product rule, with single-line-item priority off."
+logical_id = "fef8cd07-f410-4b17-b756-104d9b887251"
+content_hash = "sha256:7a4f22e0aae1d03087cdcc434ed17a769ebc3dfea67d2165810d8071c4437ecd"
+size = 1119271
+mtime_ms = 1791915627572
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/fef8cd07-f410-4b17-b756-104d9b887251/4a172b08-ecaf-4f11-83a2-47f17ff99249"
+storage_version_token = "1791915694512082"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "UsnMbyDli6v86dF80Z_Uj"
+uri = "file://generated-artifacts/asd-corrected/custom_sort_report.csv"
+type = "table"
+title = "ASD — corrected sort audit report"
+description = "Actual delivery method, style, color, size, and output sequence for every order."
+logical_id = "e59bc2d7-a7a2-4991-a2b0-9c3ae011f849"
+content_hash = "sha256:795fe8982936268dace380779ca2a3b73346dbd44e7e2700c3ce7a0e5d060439"
+size = 14542
+mtime_ms = 1791915627578
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/e59bc2d7-a7a2-4991-a2b0-9c3ae011f849/02fc5727-7beb-473d-9cc8-71d693997e83"
+storage_version_token = "1791915695195259"
+content_type = "text/csv"
