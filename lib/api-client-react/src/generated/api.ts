@@ -139,6 +139,12 @@ if(processInput.sort_fields !== undefined) {
 if(processInput.single_line_item_first !== undefined) {
  formData.append(`single_line_item_first`, processInput.single_line_item_first.toString())
  }
+if(processInput.preferred_style !== undefined) {
+ formData.append(`preferred_style`, processInput.preferred_style);
+ }
+if(processInput.preferred_color !== undefined) {
+ formData.append(`preferred_color`, processInput.preferred_color);
+ }
 if(processInput.spreadsheet_mapping !== undefined) {
  formData.append(`spreadsheet_mapping`, processInput.spreadsheet_mapping);
  }

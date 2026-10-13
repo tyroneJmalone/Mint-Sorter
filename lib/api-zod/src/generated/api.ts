@@ -22,14 +22,23 @@ export const HealthCheckResponse = zod.object({
  * @summary Sort PDF files or parse store export CSV files
  */
 export const processFilesBodySingleLineItemFirstDefault = false;
+export const processFilesBodyPreferredStyleMax = 100;
+
+export const processFilesBodyPreferredColorMax = 100;
+
+
 
 export const ProcessFilesBody = zod.object({
   "preset": zod.enum(['combine_labels', 'sort_slips', 'sort_slips_name', 'sort_slips_custom', 'sort_slips_custom_first', 'sort_labels', 'sort_both', 'match_labels', 'custom_sort', 'required_field', 'split_required_field', 'spreadsheet_sequence', 'parse_store_export']).describe('Processing preset'),
   "sort_fields": zod.string().optional().describe('JSON array of sort field names used when preset is custom_sort. Available fields: last_name, first_name, style, size, color, custom_field, delivery_method, location, sort_number, order_number, order_date'),
   "single_line_item_first": zod.boolean().default(processFilesBodySingleLineItemFirstDefault).describe('Put single-product-line orders before multi-line orders while retaining the selected sequence within each group. Applies within each birth-year batch. Not supported for combine_labels, match_labels, or parse_store_export.'),
+  "preferred_style": zod.string().max(processFilesBodyPreferredStyleMax).optional().describe('Optional exact style used to select the first matching product across an order for product sorting. Falls back to the first product.'),
+  "preferred_color": zod.string().max(processFilesBodyPreferredColorMax).optional().describe('Optional exact color restricting the preferred-style match; requires preferred_style. Matching ignores capitalization and extra whitespace.'),
   "spreadsheet_mapping": zod.string().optional().describe('JSON column mapping used by the spreadsheet_sequence preset'),
   "remove_column_indexes": zod.string().optional().describe('JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset')
 })
+
+
 
 
 export const ProcessFilesResponse = zod.object({
@@ -71,4 +80,5 @@ export const DownloadFileParams = zod.object({
   "jobId": zod.coerce.string(),
   "key": zod.coerce.string()
 })
+
 

@@ -5,7 +5,7 @@ import csv
 import json
 import re
 import zipfile
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Iterable, List, Dict, Tuple, Optional
 from xml.etree import ElementTree
@@ -14,6 +14,7 @@ import pandas as pd
 import pdfplumber
 from pypdf import PdfReader, PdfWriter
 from line_items import count_product_rows, prioritize_single_line_items
+from product_preference import product_rows, apply_product_preference, SUPPORTED_PRESETS
 
 
 SHEET_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -384,6 +385,7 @@ class SlipPage:
     order_date: str = ""
     required_field_value: str = ""
     line_item_count: int | None = None
+    product_rows: list[dict] = field(default_factory=list)
 
     @property
     def sort_key(self):
@@ -590,6 +592,7 @@ def apply_positioned_slip_fields(page, slip: SlipPage) -> None:
     if delivery_method is not None:
         slip.delivery_method = delivery_method
     slip.line_item_count = count_product_rows(page, words)
+    slip.product_rows = product_rows(page, words)
     style_header = next((w for w in words if w["text"] == "Style"), None)
     if style_header:
         headers = {
@@ -1191,8 +1194,15 @@ def process_batch(
     store_export_path: str | Path | None = None,
     remove_column_indexes: list[int] | None = None,
     single_line_item_first: bool = False,
+    preferred_style: str = "",
+    preferred_color: str = "",
     warnings: list[dict] | None = None,
 ) -> dict[str, Path]:
+    preferred_style, preferred_color = preferred_style.strip(), preferred_color.strip()
+    if preferred_color and not preferred_style:
+        raise ValueError("A preferred style is required when specifying a preferred color")
+    if preferred_style and preset not in SUPPORTED_PRESETS:
+        raise ValueError("Preferred products apply only to product-sorting presets")
     if single_line_item_first and preset in {"combine_labels", "match_labels", "parse_store_export"}:
         raise ValueError("Single-line-item priority is not available for this preset")
     out_dir = Path(out_dir)
@@ -1205,6 +1215,10 @@ def process_batch(
     groups = []
     if preset in sorting_presets:
         groups = group_slip_pages(parse_packing_slips(packing_slips_pdf))
+        if preferred_style:
+            selection_report = out_dir / "preferred_product_report.csv"
+            pd.DataFrame(apply_product_preference(groups, preferred_style, preferred_color)).to_csv(selection_report, index=False)
+            outputs["preferred_product_report"] = selection_report
         detected = missing_sort_field_warnings(groups, preset, sort_fields)
         if warnings is not None:
             warnings.extend(detected)

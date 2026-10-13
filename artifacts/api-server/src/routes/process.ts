@@ -29,6 +29,7 @@ function mimeForExt(ext: string): string {
 }
 
 const OUTPUT_LABELS: Record<string, string> = {
+  preferred_product_report: "Download preferred-product selection report CSV",
   packing_slip_consolidation_report: "Download packing-slip consolidation report CSV",
   combined_labels: "Download combined labels PDF",
   sorted_packing_slips: "Download sorted packing slips PDF",
@@ -124,6 +125,16 @@ router.post(
     }
 
     const sortFieldsRaw = req.body?.sort_fields as string | undefined;
+    const preferredStyle = typeof req.body?.preferred_style === "string" ? req.body.preferred_style.trim() : "";
+    const preferredColor = typeof req.body?.preferred_color === "string" ? req.body.preferred_color.trim() : "";
+    if ((preferredColor && !preferredStyle) || preferredStyle.length > 100 || preferredColor.length > 100) {
+      res.status(400).json({ error: "Enter a preferred style before a color; each field must be 100 characters or fewer." });
+      return;
+    }
+    if (preferredStyle && !["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_both", "sort_labels", "custom_sort"].includes(preset)) {
+      res.status(400).json({ error: "Preferred products apply only to product-sorting presets" });
+      return;
+    }
     const priorityRaw = req.body?.single_line_item_first;
     if (priorityRaw !== undefined && priorityRaw !== "true" && priorityRaw !== "false") {
       res.status(400).json({ error: "single_line_item_first must be true or false" });
@@ -234,6 +245,8 @@ router.post(
       packingPath,
       outDir,
       ...(singleLineItemFirst ? ["--single-line-item-first"] : []),
+      ...(preferredStyle ? ["--preferred-style", preferredStyle] : []),
+      ...(preferredColor ? ["--preferred-color", preferredColor] : []),
       ...(sortFields.length > 0 ? ["--sort-fields", JSON.stringify(sortFields)] : []),
       ...(spreadsheetFile
         ? [

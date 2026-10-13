@@ -14,6 +14,16 @@ export interface ProcessInput {
   sort_fields?: string;
   /** Put single-product-line orders before multi-line orders while retaining the selected sequence within each group. Applies within each birth-year batch. Not supported for combine_labels, match_labels, or parse_store_export. */
   single_line_item_first?: boolean;
+  /**
+     * Optional exact style used to select the first matching product across an order for product sorting. Falls back to the first product.
+     * @maxLength 100
+     */
+  preferred_style?: string;
+  /**
+     * Optional exact color restricting the preferred-style match; requires preferred_style. Matching ignores capitalization and extra whitespace.
+     * @maxLength 100
+     */
+  preferred_color?: string;
   /** JSON column mapping used by the spreadsheet_sequence preset */
   spreadsheet_mapping?: string;
   /** JSON array of additional zero-based CSV column indexes removed by the parse_store_export preset */

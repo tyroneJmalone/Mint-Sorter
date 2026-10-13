@@ -4,3 +4,4 @@
 - [Packing-slip layout variation](packing-slip-layouts.md) — store titles, optional table columns, and wrapped cells make flattened-text sort extraction unsafe.
 - [Python installation limitation](python-installation.md) — managed Python installs can target the read-only Nix interpreter instead of workspace packages.
 - [Single-line-item priority](single-line-item-priority.md) — count product rows, not quantities or pages; preserve the selected sort within each priority group.
+- [Preferred sorting product](preferred-sorting-product.md) — optional style/color chooses the representative row, not a new leading priority or a printed-row reorder.

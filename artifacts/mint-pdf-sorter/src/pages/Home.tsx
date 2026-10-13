@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,6 +33,8 @@ export default function Home() {
   const [preset, setPreset] = useState<ProcessInputPreset>("combine_labels");
   const [sortFields, setSortFields] = useState<string[]>([]);
   const [singleLineItemFirst, setSingleLineItemFirst] = useState(false);
+  const [preferredStyle, setPreferredStyle] = useState("");
+  const [preferredColor, setPreferredColor] = useState("");
   const [packingSlips, setPackingSlips] = useState<File[]>([]);
   const [labels, setLabels] = useState<File[]>([]);
   const [spreadsheet, setSpreadsheet] = useState<File[]>([]);
@@ -48,6 +51,7 @@ export default function Home() {
   const needsStoreExport = preset === "parse_store_export";
   const needsPackingSlipsForPreset = needsPackingSlips || needsSpreadsheet;
   const supportsSingleLineItemFirst = needsPackingSlipsForPreset && preset !== "match_labels";
+  const supportsPreferredProduct = ["sort_slips", "sort_slips_name", "sort_slips_custom", "sort_both", "sort_labels", "custom_sort"].includes(preset);
 
   const handleProcess = async () => {
     if (needsPackingSlipsForPreset && packingSlips.length === 0) {
@@ -84,6 +88,13 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("preset", preset);
+      if (supportsPreferredProduct) {
+        if (preferredColor.trim() && !preferredStyle.trim()) {
+          throw new Error("Enter a preferred style before specifying a preferred color.");
+        }
+        formData.append("preferred_style", preferredStyle.trim());
+        formData.append("preferred_color", preferredColor.trim());
+      }
       if (supportsSingleLineItemFirst) {
         formData.append("single_line_item_first", String(singleLineItemFirst));
       }
@@ -139,6 +150,8 @@ export default function Home() {
   };
 
   const handleReset = () => {
+    setPreferredStyle("");
+    setPreferredColor("");
     setSingleLineItemFirst(false);
     setPackingSlips([]);
     setLabels([]);
@@ -219,6 +232,30 @@ export default function Home() {
                 </motion.div>
               )}
 
+              {supportsPreferredProduct && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <h3 className="font-medium">Preferred sorting product (optional)</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="preferred-style">Preferred style</Label>
+                      <Input id="preferred-style" value={preferredStyle} maxLength={100}
+                        placeholder="e.g. 5000" disabled={isProcessing}
+                        onChange={(event) => setPreferredStyle(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="preferred-color">Preferred color (optional)</Label>
+                      <Input id="preferred-color" value={preferredColor} maxLength={100}
+                        placeholder="e.g. Royal" disabled={isProcessing}
+                        onChange={(event) => setPreferredColor(event.target.value)} />
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Uses the first matching product anywhere in the order for style, color, and size sorting.
+                    No match? Uses the first product. Leave blank for normal sorting.
+                    Your sort-field order and printed product rows stay unchanged.
+                  </p>
+                </div>
+              )}
               {supportsSingleLineItemFirst && (
                 <div className="rounded-lg border p-4 space-y-2">
                   <label className="flex items-center gap-3 font-medium cursor-pointer">

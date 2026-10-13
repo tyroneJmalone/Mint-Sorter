@@ -154,3 +154,31 @@ mtime_ms = 1791915627578
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/e59bc2d7-a7a2-4991-a2b0-9c3ae011f849/02fc5727-7beb-473d-9cc8-71d693997e83"
 storage_version_token = "1791915695195259"
 content_type = "text/csv"
+
+[[outputs]]
+id = "R8UJRDeRcjN1Ei58d4veo"
+uri = "file://generated-artifacts/asd-preferred/sorted_packing_slips.pdf"
+type = "pdf"
+title = "ASD — preferred 5000 / Royal sort"
+description = "Delivery Method → Style → Color → Size, selecting 5000 / Royal wherever it appears in an order. Single-line-item priority is off."
+logical_id = "06b45c73-eda7-4008-b7d9-6162f903a33e"
+content_hash = "sha256:a9f66a6b6c1fdf10450e3fc2d95d66da7eccab05d94702c436c67cd56ea7dde7"
+size = 1119271
+mtime_ms = 1791915991276
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/06b45c73-eda7-4008-b7d9-6162f903a33e/026ce4ec-6759-4bc3-8c7a-48012dc9689b"
+storage_version_token = "1791916053495948"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "AxfZIGecTZbfgEpqJ2cxu"
+uri = "file://generated-artifacts/asd-preferred/preferred_product_report.csv"
+type = "table"
+title = "Preferred-product selection report"
+description = "Selected product, original page and row, and first-product fallback for each of the 135 orders."
+logical_id = "d79c8f70-17e3-48a6-8c09-978c622964e9"
+content_hash = "sha256:1ca1cdd3927671371efff24bd510e1094ac5a55b983a508076985c4e125a205a"
+size = 8653
+mtime_ms = 1791915991290
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:e6c3169d-2b3a-45ff-b8f6-cf370227f737/d79c8f70-17e3-48a6-8c09-978c622964e9/56f43f8f-1b2b-477b-bbb5-f030da4145d6"
+storage_version_token = "1791916054171166"
+content_type = "text/csv"
